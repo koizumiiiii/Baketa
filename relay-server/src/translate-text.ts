@@ -138,7 +138,7 @@ export async function handleTranslateText(
   const yearMonth = getCurrentYearMonth();
 
   // 1. DeepL Free を試行
-  if (env.DEEPL_API_KEY) {
+  if (env.DEEPL_API_KEY && env.DEEPL_API_KEY.length > 0) {
     const deeplUsage = await getMonthlyUsage(env.SESSIONS, KV_PREFIX_DEEPL, yearMonth);
 
     if (deeplUsage + textLength <= DEEPL_MONTHLY_CHAR_LIMIT) {
@@ -174,7 +174,7 @@ export async function handleTranslateText(
   }
 
   // 2. Google Translation Free を試行
-  if (env.GOOGLE_TRANSLATE_API_KEY) {
+  if (env.GOOGLE_TRANSLATE_API_KEY && env.GOOGLE_TRANSLATE_API_KEY.length > 0) {
     const googleUsage = await getMonthlyUsage(env.SESSIONS, KV_PREFIX_GOOGLE, yearMonth);
 
     if (googleUsage + textLength <= GOOGLE_MONTHLY_CHAR_LIMIT) {

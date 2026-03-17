@@ -1151,6 +1151,8 @@ internal sealed class Program
                         Console.WriteLine(initStartMessage);
                         Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(initStartMessage);
 
+                        // [Issue #542] NLLBスキップ判定はBackgroundWarmupServiceで実施
+
                         // 翻訳モデルの事前初期化実行
                         await appInitializer.InitializeAsync().ConfigureAwait(false);
                         timer.Stop();

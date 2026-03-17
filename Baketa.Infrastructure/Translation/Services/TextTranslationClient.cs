@@ -105,6 +105,23 @@ public sealed class TextTranslationClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// [Issue #542] テキスト翻訳サービスが利用可能かチェック（疎通確認）
+    /// </summary>
+    public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // 短いテキストでDeepL/Googleの疎通確認
+            var result = await TranslateAsync("hello", "en", "ja", cancellationToken).ConfigureAwait(false);
+            return result != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         _httpClient.Dispose();

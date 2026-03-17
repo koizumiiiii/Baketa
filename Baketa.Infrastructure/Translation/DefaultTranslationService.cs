@@ -25,6 +25,7 @@ public class DefaultTranslationService : ITranslationService
     private readonly IConfiguration _configuration;
     private readonly IEventAggregator? _eventAggregator;
     private readonly TextTranslationClient? _textTranslationClient;
+    private volatile bool _nllbUnloaded; // [Issue #542] NLLBアンロード状態
 
     /// <summary>
     /// コンストラクタ
@@ -334,7 +335,20 @@ public class DefaultTranslationService : ITranslationService
             if (textResults != null)
             {
                 _logger.LogInformation("[Issue #542] テキスト翻訳成功（DeepL/Google） - NLLBスキップ");
+
+                // NLLBアンロード（メモリ節約）
+                if (!_nllbUnloaded)
+                {
+                    await TryUnloadNllbAsync().ConfigureAwait(false);
+                }
+
                 return textResults;
+            }
+
+            // テキスト翻訳失敗 → NLLBが必要。アンロード済みなら再ロード
+            if (_nllbUnloaded)
+            {
+                await TryReloadNllbAsync().ConfigureAwait(false);
             }
         }
 
@@ -408,6 +422,43 @@ public class DefaultTranslationService : ITranslationService
         }
 
         return result!;
+    }
+
+    /// <summary>
+    /// [Issue #542] NLLBモデルをアンロードしてメモリを解放
+    /// </summary>
+    private async Task TryUnloadNllbAsync()
+    {
+        try
+        {
+            if (ActiveEngine is Baketa.Core.Abstractions.Translation.IUnloadableTranslationEngine unloadable)
+            {
+                await unloadable.UnloadModelsAsync().ConfigureAwait(false);
+                _nllbUnloaded = true;
+                _logger.LogInformation("[Issue #542] NLLBモデルをアンロード（DeepL/Google利用可能のためメモリ節約）");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[Issue #542] NLLBアンロードエラー（無視）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #542] NLLBモデルを再ロード（テキスト翻訳フォールバック用）
+    /// </summary>
+    private async Task TryReloadNllbAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[Issue #542] NLLBモデルを再ロード（テキスト翻訳利用不可のため）");
+            await ActiveEngine.InitializeAsync().ConfigureAwait(false);
+            _nllbUnloaded = false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #542] NLLBモデル再ロード失敗");
+        }
     }
 
     /// <summary>

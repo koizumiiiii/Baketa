@@ -322,7 +322,33 @@ public sealed class BackgroundWarmupService(
             var progressIncrement = 0.3 / translationEngines.Count; // 30%を翻訳エンジン数で分割
 
             // Cloudモード時はアンロード可能な大規模モデルエンジンの初期化をスキップ
+            // [Issue #542] テキスト翻訳（DeepL/Google）利用可能時もスキップ（メモリ節約）
             var skipHeavyModels = !IsUseLocalEngine();
+            if (!skipHeavyModels)
+            {
+                var textClient = serviceProvider.GetService<Baketa.Infrastructure.Translation.Services.TextTranslationClient>();
+                if (textClient != null)
+                {
+                    try
+                    {
+                        _logger.LogInformation("[Issue #542] テキスト翻訳サービスの疎通確認中...");
+                        var isAvailable = await textClient.IsAvailableAsync(cancellationToken).ConfigureAwait(false);
+                        if (isAvailable)
+                        {
+                            skipHeavyModels = true;
+                            _logger.LogInformation("[Issue #542] テキスト翻訳利用可能 → NLLBモデルのロードをスキップ（メモリ節約）");
+                        }
+                        else
+                        {
+                            _logger.LogInformation("[Issue #542] テキスト翻訳利用不可 → NLLBモデルをロード");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "[Issue #542] テキスト翻訳疎通確認エラー → NLLBモデルをロード");
+                    }
+                }
+            }
 
             foreach (var (engine, index) in translationEngines.Select((e, i) => (e, i)))
             {

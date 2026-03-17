@@ -779,6 +779,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     {
                         try
                         {
+                            // [Issue #542] NLLBスキップ判定はBackgroundWarmupServiceで実施
                             await appInitializer.InitializeAsync().ConfigureAwait(false);
                             Console.WriteLine("✅ [PRELOAD] 翻訳モデル事前ロード完了 - 初回翻訳は即座実行可能");
                         }
