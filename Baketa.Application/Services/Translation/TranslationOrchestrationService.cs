@@ -752,18 +752,25 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 if (useLocal)
                 {
-                    // ローカルモードに切替 → ONNXモデルをプリロード
-                    var engine = _translationService.GetAvailableEngines()
-                        .OfType<IUnloadableTranslationEngine>()
-                        .FirstOrDefault();
-
-                    if (engine != null)
+                    // [Issue #542] テキスト翻訳フォールバック設定済みならNLLBプリロードをスキップ
+                    if (_translationService.HasTextTranslationFallback)
                     {
-                        var isReady = await ((ITranslationEngine)engine).IsReadyAsync().ConfigureAwait(false);
-                        if (!isReady)
+                        _logger?.LogInformation("[Issue #542] ローカルモード切替: テキスト翻訳フォールバック設定済み → NLLBプリロードスキップ");
+                    }
+                    else
+                    {
+                        var engine = _translationService.GetAvailableEngines()
+                            .OfType<IUnloadableTranslationEngine>()
+                            .FirstOrDefault();
+
+                        if (engine != null)
                         {
-                            _logger?.LogInformation("ローカルモードに切替 → ONNXモデルをプリロード開始");
-                            await ((ITranslationEngine)engine).InitializeAsync().ConfigureAwait(false);
+                            var isReady = await ((ITranslationEngine)engine).IsReadyAsync().ConfigureAwait(false);
+                            if (!isReady)
+                            {
+                                _logger?.LogInformation("ローカルモードに切替 → ONNXモデルをプリロード開始");
+                                await ((ITranslationEngine)engine).InitializeAsync().ConfigureAwait(false);
+                            }
                         }
                     }
                 }

@@ -27,6 +27,9 @@ public class DefaultTranslationService : ITranslationService
     private readonly TextTranslationClient? _textTranslationClient;
     private volatile bool _nllbUnloaded; // [Issue #542] NLLBアンロード状態
 
+    /// <inheritdoc/>
+    public bool HasTextTranslationFallback => _textTranslationClient != null;
+
     /// <summary>
     /// コンストラクタ
     /// </summary>
