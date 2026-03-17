@@ -926,22 +926,12 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     {
         try
         {
-            // [Issue #511] 早期チェックで既に初期化済みの場合
+            // [Issue #511] 早期チェックで既に初期化済みの場合はスキップ
+            // [Issue #546] 早期チェック（CheckForUpdatesEarlyAsync）で既にAppCastを取得済みのため、
+            // 再度のバックグラウンドチェックは不要（重複リクエスト防止）
             if (_updateService != null)
             {
-                _logger?.LogInformation("[Issue #511] UpdateService既に初期化済み - バックグラウンドチェックのみ");
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(5000).ConfigureAwait(false);
-                        await _updateService.CheckForUpdatesInBackgroundAsync().ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "[Issue #249] サイレント更新チェック失敗（継続）");
-                    }
-                });
+                _logger?.LogInformation("[Issue #546] UpdateService既に初期化済み - 重複チェックをスキップ");
                 return;
             }
 
