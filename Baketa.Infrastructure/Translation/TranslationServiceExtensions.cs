@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Cloud;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,19 @@ public static class TranslationServiceExtensions
         services.AddSingleton<MockTranslationEngine>();
 #endif
 
-        // 翻訳サービスを登録
-        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();
+        // [Issue #542] テキスト翻訳クライアント（DeepL/Google Free）
+        services.AddSingleton<Services.TextTranslationClient>();
+
+        // 翻訳サービスを登録（TextTranslationClientを明示的に注入）
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<DefaultTranslationService>>();
+            var engines = sp.GetServices<Baketa.Core.Abstractions.Translation.ITranslationEngine>();
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var eventAggregator = sp.GetService<Baketa.Core.Abstractions.Events.IEventAggregator>();
+            var textTranslationClient = sp.GetService<Services.TextTranslationClient>();
+            return new DefaultTranslationService(logger, engines, configuration, eventAggregator, textTranslationClient);
+        });
 
         return services;
     }

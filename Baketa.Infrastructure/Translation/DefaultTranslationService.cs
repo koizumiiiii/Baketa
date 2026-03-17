@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Language = Baketa.Core.Models.Translation.Language;
@@ -23,6 +24,7 @@ public class DefaultTranslationService : ITranslationService
     private readonly List<ITranslationEngine> _availableEngines;
     private readonly IConfiguration _configuration;
     private readonly IEventAggregator? _eventAggregator;
+    private readonly TextTranslationClient? _textTranslationClient;
 
     /// <summary>
     /// コンストラクタ
@@ -35,12 +37,14 @@ public class DefaultTranslationService : ITranslationService
         ILogger<DefaultTranslationService> logger,
         IEnumerable<ITranslationEngine> engines,
         IConfiguration configuration,
-        IEventAggregator? eventAggregator = null)
+        IEventAggregator? eventAggregator = null,
+        TextTranslationClient? textTranslationClient = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _availableEngines = engines?.ToList() ?? throw new ArgumentNullException(nameof(engines));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _eventAggregator = eventAggregator;
+        _textTranslationClient = textTranslationClient;
 
         Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService作成 - エンジン数: {_availableEngines.Count}");
         _logger.LogInformation("DefaultTranslationService作成 - エンジン数: {Count}", _availableEngines.Count);
@@ -322,7 +326,19 @@ public class DefaultTranslationService : ITranslationService
             });
         }
 
-        // 翻訳実行
+        // [Issue #542] テキスト翻訳を先に試行（DeepL/Google Free）
+        if (_textTranslationClient != null)
+        {
+            var textResults = await TryTextTranslationBatchAsync(texts, sourceLang, targetLang, cancellationToken)
+                .ConfigureAwait(false);
+            if (textResults != null)
+            {
+                _logger.LogInformation("[Issue #542] テキスト翻訳成功（DeepL/Google） - NLLBスキップ");
+                return textResults;
+            }
+        }
+
+        // 翻訳実行（NLLB）
         var logPath2 = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
 
         var result = await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
@@ -392,5 +408,60 @@ public class DefaultTranslationService : ITranslationService
         }
 
         return result!;
+    }
+
+    /// <summary>
+    /// [Issue #542] テキスト翻訳バッチ試行
+    /// DeepL/Google Freeで翻訳できれば結果を返す。失敗時はnull（NLLBにフォールバック）。
+    /// </summary>
+    private async Task<IReadOnlyList<TransModels.TranslationResponse>?> TryTextTranslationBatchAsync(
+        IReadOnlyList<string> texts,
+        Language sourceLang,
+        Language targetLang,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var responses = new List<TransModels.TranslationResponse>();
+
+            foreach (var text in texts)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var result = await _textTranslationClient!.TranslateAsync(
+                    text, sourceLang.Code, targetLang.Code, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (result == null)
+                {
+                    // 1つでも失敗したらバッチ全体をNLLBにフォールバック
+                    _logger.LogDebug("[Issue #542] テキスト翻訳失敗 → NLLBフォールバック");
+                    return null;
+                }
+
+                responses.Add(new TransModels.TranslationResponse
+                {
+                    RequestId = Guid.NewGuid(),
+                    SourceText = text,
+                    TranslatedText = result.TranslatedText,
+                    SourceLanguage = sourceLang,
+                    TargetLanguage = targetLang,
+                    EngineName = $"TextTranslation ({result.Engine})",
+                    IsSuccess = true,
+                    ConfidenceScore = 1.0f
+                });
+            }
+
+            return responses;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[Issue #542] テキスト翻訳バッチエラー → NLLBフォールバック");
+            return null;
+        }
     }
 }

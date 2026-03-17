@@ -115,9 +115,19 @@ public sealed class ApplicationModule : ServiceModuleBase
     private static void RegisterTranslationApplicationServices(IServiceCollection services)
     {
         // TranslationServiceExtensionsが呼ばれていない場合の保険でDefaultTranslationServiceを登録
+        // [Issue #542] TextTranslationClientを明示的に注入
         if (!services.Any(s => s.ServiceType == typeof(TranslationAbstractions.ITranslationService)))
         {
-            services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
+            services.AddSingleton<Baketa.Infrastructure.Translation.Services.TextTranslationClient>();
+            services.AddSingleton<TranslationAbstractions.ITranslationService>(sp =>
+            {
+                var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DefaultTranslationService>>();
+                var engines = sp.GetServices<TranslationAbstractions.ITranslationEngine>();
+                var configuration = sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+                var eventAggregator = sp.GetService<Baketa.Core.Abstractions.Events.IEventAggregator>();
+                var textTranslationClient = sp.GetService<Baketa.Infrastructure.Translation.Services.TextTranslationClient>();
+                return new DefaultTranslationService(logger, engines, configuration, eventAggregator, textTranslationClient);
+            });
         }
 
         // [Issue #293 Phase 8] TranslationGatekeeperService廃止 - TextChangeDetectionServiceに統合済み
