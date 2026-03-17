@@ -752,16 +752,16 @@
     <value>Standard方案 - 无广告，仅标准翻译</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro方案 - EX翻译，月度配额1000万</value>
+    <value>Pro方案 - EX翻译，月度配额100,000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premia方案 - EX翻译，月度配额800万</value>
+    <value>Premia方案 - EX翻译，月度配额80,000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premium方案 - EX翻译，月度配额2000万</value>
+    <value>Premium方案 - EX翻译，月度配额200,000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimate方案 - EX翻译，月度配额5000万</value>
+    <value>Ultimate方案 - EX翻译，月度配额500,000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>无期限</value>
@@ -846,13 +846,13 @@
     <value>可用方案:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro（$3/月）：EX翻译，月度配额1000万</value>
+    <value>• Pro（$3/月）：EX翻译，月度配额100,000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium（$5/月）：EX翻译，月度配额2000万</value>
+    <value>• Premium（$5/月）：EX翻译，月度配额200,000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate（$9/月）：EX翻译，月度配额5000万</value>
+    <value>• Ultimate（$9/月）：EX翻译，月度配额500,000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>登录</value>
@@ -1808,6 +1808,15 @@
   </data>
   <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
     <value>仅对选定区域进行OCR（点击调整）</value>
+  </data>
+  <data name="WelcomeBonus_Title" xml:space="preserve">
+    <value>感谢注册！</value>
+  </data>
+  <data name="WelcomeBonus_Message" xml:space="preserve">
+    <value>已赠送{0}EX模式高品质翻译体验奖励。快来试试EX模式的高品质翻译吧！</value>
+  </data>
+  <data name="WelcomeBonus_OK" xml:space="preserve">
+    <value>OK</value>
   </data>
 
 </root>

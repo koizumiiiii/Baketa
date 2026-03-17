@@ -92,6 +92,17 @@ public interface IBonusTokenService
     bool HasPendingSync { get; }
 
     /// <summary>
+    /// [Issue #545] ウェルカムボーナスが今回の同期で付与されたかどうか
+    /// UI通知後にfalseにリセットされる
+    /// </summary>
+    bool WelcomeBonusJustGranted { get; set; }
+
+    /// <summary>
+    /// [Issue #545] 付与されたウェルカムボーナスの量
+    /// </summary>
+    long WelcomeBonusAmount { get; set; }
+
+    /// <summary>
     /// [Issue #299] 統合エンドポイントから取得したデータを適用
     /// </summary>
     /// <param name="bonuses">ボーナストークン一覧</param>

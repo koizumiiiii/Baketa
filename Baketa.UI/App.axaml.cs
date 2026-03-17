@@ -560,6 +560,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         // --- 4.5 Patreon認証結果の通知表示（Issue #233） ---
                         await ShowPendingPatreonNotificationAsync(serviceProvider);
 
+                        // --- 4.6 [Issue #545] ウェルカムボーナス通知 ---
+                        CheckAndShowWelcomeBonusAsync(serviceProvider);
+
                         // 未認証の場合はSignupViewをダイアログとして表示（初回起動時はサインアップを推奨）
                         if (!isAuthenticated)
                         {
@@ -916,6 +919,61 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // 警告表示の失敗はアプリケーション起動をブロックしない
             _logger?.LogWarning(ex, "テストモード警告表示中にエラー（継続）");
         }
+    }
+
+    /// <summary>
+    /// <summary>
+    /// [Issue #545] ウェルカムボーナス通知のイベント購読
+    /// BonusTokensChangedイベントでウェルカムボーナスフラグを検知し、ダイアログを表示
+    /// </summary>
+    private void CheckAndShowWelcomeBonusAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var bonusTokenService = serviceProvider.GetService<Baketa.Core.Abstractions.License.IBonusTokenService>();
+            if (bonusTokenService == null) return;
+
+            // 既にフラグが立っている場合（起動時に同期済み）
+            if (bonusTokenService.WelcomeBonusJustGranted)
+            {
+                ShowWelcomeBonusDialog(bonusTokenService);
+                return;
+            }
+
+            // イベント購読（同期がまだ完了していない場合）
+            bonusTokenService.BonusTokensChanged += (_, _) =>
+            {
+                if (bonusTokenService.WelcomeBonusJustGranted)
+                {
+                    ShowWelcomeBonusDialog(bonusTokenService);
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "[Issue #545] ウェルカムボーナス通知初期化エラー（継続）");
+        }
+    }
+
+    private bool _welcomeBonusDialogShown;
+
+    private void ShowWelcomeBonusDialog(Baketa.Core.Abstractions.License.IBonusTokenService bonusTokenService)
+    {
+        // 複数回表示防止
+        if (_welcomeBonusDialogShown) return;
+        _welcomeBonusDialogShown = true;
+
+        bonusTokenService.WelcomeBonusJustGranted = false;
+        var amount = bonusTokenService.WelcomeBonusAmount;
+
+        _logger?.LogInformation("[Issue #545] ウェルカムボーナスダイアログ表示: Amount={Amount}", amount);
+
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var mainWindow = (Avalonia.Application.Current?.ApplicationLifetime as
+                Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            await Views.WelcomeBonusWindow.ShowAsync(amount, mainWindow);
+        });
     }
 
     /// <summary>

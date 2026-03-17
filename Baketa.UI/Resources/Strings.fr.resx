@@ -752,16 +752,16 @@
     <value>Forfait Standard - Sans publicité, traduction standard uniquement</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Forfait Pro - Traduction EX, quota mensuel de 10M</value>
+    <value>Forfait Pro - Traduction EX, quota mensuel de 100 000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Forfait Premia - Traduction EX, quota mensuel de 8M</value>
+    <value>Forfait Premia - Traduction EX, quota mensuel de 80 000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Forfait Premium - Traduction EX, quota mensuel de 20M</value>
+    <value>Forfait Premium - Traduction EX, quota mensuel de 200 000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Forfait Ultimate - Traduction EX, quota mensuel de 50M</value>
+    <value>Forfait Ultimate - Traduction EX, quota mensuel de 500 000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>Pas d'expiration</value>
@@ -846,13 +846,13 @@
     <value>Forfaits disponibles :</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro (3 $/mois) : Traduction EX, quota mensuel de 10M</value>
+    <value>• Pro (3 $/mois) : Traduction EX, quota mensuel de 100 000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium (5 $/mois) : Traduction EX, quota mensuel de 20M</value>
+    <value>• Premium (5 $/mois) : Traduction EX, quota mensuel de 200 000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate (9 $/mois) : Traduction EX, quota mensuel de 50M</value>
+    <value>• Ultimate (9 $/mois) : Traduction EX, quota mensuel de 500 000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Connexion</value>
@@ -1808,6 +1808,15 @@ Action : Veuillez redémarrer l'application.</value>
   </data>
   <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
     <value>OCR selected region (click to adjust)</value>
+  </data>
+  <data name="WelcomeBonus_Title" xml:space="preserve">
+    <value>Thanks for signing up!</value>
+  </data>
+  <data name="WelcomeBonus_Message" xml:space="preserve">
+    <value>You've received {0} bonus to try EX Mode for high-quality translations. Give EX Mode a try!</value>
+  </data>
+  <data name="WelcomeBonus_OK" xml:space="preserve">
+    <value>OK</value>
   </data>
 
 </root>
