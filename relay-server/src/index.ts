@@ -61,6 +61,7 @@
  */
 
 import { handleTranslate, handleQuotaStatus, TranslateEnv } from './translate';
+import { handleTranslateText, TextTranslateEnv } from './translate-text';
 import { handleCrashReport, CrashReportEnv } from './crash-report';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SignJWT, jwtVerify, JWTPayload } from 'jose';
@@ -2502,6 +2503,8 @@ export default {
           return handlePatreonRevokeAll(request, env, origin, allowedOrigins);
         case '/api/translate':
           return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
+        case '/api/translate-text':
+          return handleTranslateText(request, env as TextTranslateEnv, origin, allowedOrigins);
         case '/api/promotion/redeem':
           return handlePromotionRedeem(request, env, origin, allowedOrigins);
         case '/api/promotion/status':
