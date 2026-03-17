@@ -56,6 +56,12 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    public bool WelcomeBonusJustGranted { get; set; }
+
+    /// <inheritdoc/>
+    public long WelcomeBonusAmount { get; set; }
+
     public BonusTokenService(
         HttpClient httpClient,
         IApiRequestDeduplicator deduplicator,

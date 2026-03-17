@@ -1809,5 +1809,14 @@ Ação: Reinicie o aplicativo.</value>
   <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
     <value>OCR selected region (click to adjust)</value>
   </data>
+  <data name="WelcomeBonus_Title" xml:space="preserve">
+    <value>Thanks for signing up!</value>
+  </data>
+  <data name="WelcomeBonus_Message" xml:space="preserve">
+    <value>You've received {0} bonus to try EX Mode for high-quality translations. Give EX Mode a try!</value>
+  </data>
+  <data name="WelcomeBonus_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
 
 </root>

@@ -718,4 +718,9 @@ public static class Strings
     public static string Lang_ChineseVariant_Auto => GetString("Lang_ChineseVariant_Auto");
     public static string Lang_ChineseVariant_Cantonese => GetString("Lang_ChineseVariant_Cantonese");
     public static string Lang_TranslationStrategy_TwoStage => GetString("Lang_TranslationStrategy_TwoStage");
+
+    // [Issue #545] Welcome Bonus
+    public static string WelcomeBonus_Title => GetString("WelcomeBonus_Title");
+    public static string WelcomeBonus_Message => GetString("WelcomeBonus_Message");
+    public static string WelcomeBonus_OK => GetString("WelcomeBonus_OK");
 }

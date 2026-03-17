@@ -1809,5 +1809,14 @@
   <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
     <value>僅對選定區域進行OCR（點擊調整）</value>
   </data>
+  <data name="WelcomeBonus_Title" xml:space="preserve">
+    <value>感謝註冊！</value>
+  </data>
+  <data name="WelcomeBonus_Message" xml:space="preserve">
+    <value>已贈送{0}EX模式高品質翻譯體驗獎勵。快來試試EX模式的高品質翻譯吧！</value>
+  </data>
+  <data name="WelcomeBonus_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
 
 </root>

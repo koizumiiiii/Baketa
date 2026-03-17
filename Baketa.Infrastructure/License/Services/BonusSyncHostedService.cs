@@ -296,11 +296,18 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
             }
 
             // [Issue #332] ウェルカムボーナス付与をログ
+            // [Issue #545] UIダイアログ表示用フラグを設定
             if (syncResult.WelcomeBonus?.Granted == true)
             {
                 _logger.LogInformation(
                     "[Issue #332] ウェルカムボーナス付与完了: Amount={Amount}",
                     syncResult.WelcomeBonus.Amount);
+
+                if (_bonusTokenService != null)
+                {
+                    _bonusTokenService.WelcomeBonusJustGranted = true;
+                    _bonusTokenService.WelcomeBonusAmount = syncResult.WelcomeBonus.Amount;
+                }
             }
 
             // ボーナストークン状態を適用（成功した場合、または部分的失敗でもbonus_tokensが成功した場合）
