@@ -752,16 +752,16 @@
     <value>Standard方案 - 無廣告，僅標準翻譯</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro方案 - EX翻譯，每月配額1000萬</value>
+    <value>Pro方案 - EX翻譯，每月配額100,000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premia方案 - EX翻譯，每月配額800萬</value>
+    <value>Premia方案 - EX翻譯，每月配額80,000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premium方案 - EX翻譯，每月配額2000萬</value>
+    <value>Premium方案 - EX翻譯，每月配額200,000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimate方案 - EX翻譯，每月配額5000萬</value>
+    <value>Ultimate方案 - EX翻譯，每月配額500,000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>無期限</value>
@@ -846,13 +846,13 @@
     <value>可用方案:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro（$3/月）：EX翻譯，每月配額1000萬</value>
+    <value>• Pro（$3/月）：EX翻譯，每月配額100,000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium（$5/月）：EX翻譯，每月配額2000萬</value>
+    <value>• Premium（$5/月）：EX翻譯，每月配額200,000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate（$9/月）：EX翻譯，每月配額5000萬</value>
+    <value>• Ultimate（$9/月）：EX翻譯，每月配額500,000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>登入</value>

@@ -752,16 +752,16 @@
     <value>Standard-Plan - Werbefrei, nur Standardübersetzung</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro-Plan - EX-Übersetzung, 10M monatliches Kontingent</value>
+    <value>Pro-Plan - EX-Übersetzung, 100.000 monatliches Kontingent</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premia-Plan - EX-Übersetzung, 8M monatliches Kontingent</value>
+    <value>Premia-Plan - EX-Übersetzung, 80.000 monatliches Kontingent</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premium-Plan - EX-Übersetzung, 20M monatliches Kontingent</value>
+    <value>Premium-Plan - EX-Übersetzung, 200.000 monatliches Kontingent</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimate-Plan - EX-Übersetzung, 50M monatliches Kontingent</value>
+    <value>Ultimate-Plan - EX-Übersetzung, 500.000 monatliches Kontingent</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>Kein Ablaufdatum</value>
@@ -846,13 +846,13 @@
     <value>Verfügbare Pläne:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro (3 $/Monat): EX-Übersetzung, 10M monatliches Kontingent</value>
+    <value>• Pro (3 $/Monat): EX-Übersetzung, 100.000 monatliches Kontingent</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium (5 $/Monat): EX-Übersetzung, 20M monatliches Kontingent</value>
+    <value>• Premium (5 $/Monat): EX-Übersetzung, 200.000 monatliches Kontingent</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate (9 $/Monat): EX-Übersetzung, 50M monatliches Kontingent</value>
+    <value>• Ultimate (9 $/Monat): EX-Übersetzung, 500.000 monatliches Kontingent</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Anmelden</value>

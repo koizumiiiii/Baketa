@@ -752,16 +752,16 @@
     <value>Plan Estándar - Sin anuncios, solo traducción estándar</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Plan Pro - Traducción EX, cuota mensual de 10M</value>
+    <value>Plan Pro - Traducción EX, cuota mensual de 100.000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Plan Premia - Traducción EX, cuota mensual de 8M</value>
+    <value>Plan Premia - Traducción EX, cuota mensual de 80.000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Plan Premium - Traducción EX, cuota mensual de 20M</value>
+    <value>Plan Premium - Traducción EX, cuota mensual de 200.000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Plan Ultimate - Traducción EX, cuota mensual de 50M</value>
+    <value>Plan Ultimate - Traducción EX, cuota mensual de 500.000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>Sin vencimiento</value>
@@ -846,13 +846,13 @@
     <value>Planes disponibles:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/mes): Traducción EX, cuota mensual de 10M</value>
+    <value>• Pro ($3/mes): Traducción EX, cuota mensual de 100.000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/mes): Traducción EX, cuota mensual de 20M</value>
+    <value>• Premium ($5/mes): Traducción EX, cuota mensual de 200.000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/mes): Traducción EX, cuota mensual de 50M</value>
+    <value>• Ultimate ($9/mes): Traducción EX, cuota mensual de 500.000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Iniciar sesión</value>

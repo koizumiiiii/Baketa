@@ -752,16 +752,16 @@
     <value>スタンダードプラン - 広告なし、標準翻訳のみ</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Proプラン - EX翻訳 月間利用枠1,000万</value>
+    <value>Proプラン - EX翻訳 月間利用枠100,000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premiaプラン - EX翻訳 月間利用枠800万</value>
+    <value>Premiaプラン - EX翻訳 月間利用枠80,000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premiumプラン - EX翻訳 月間利用枠2,000万</value>
+    <value>Premiumプラン - EX翻訳 月間利用枠200,000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimateプラン - EX翻訳 月間利用枠5,000万</value>
+    <value>Ultimateプラン - EX翻訳 月間利用枠500,000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>無期限</value>
@@ -846,13 +846,13 @@
     <value>利用可能なプラン:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/月): EX翻訳 月間利用枠1,000万</value>
+    <value>• Pro ($3/月): EX翻訳 月間利用枠100,000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/月): EX翻訳 月間利用枠2,000万</value>
+    <value>• Premium ($5/月): EX翻訳 月間利用枠200,000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/月): EX翻訳 月間利用枠5,000万</value>
+    <value>• Ultimate ($9/月): EX翻訳 月間利用枠500,000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>ログイン</value>

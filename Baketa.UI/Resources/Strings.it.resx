@@ -752,16 +752,16 @@
     <value>Piano Standard - Senza pubblicità, solo traduzione standard</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Piano Pro - Traduzione EX, quota mensile 10M</value>
+    <value>Piano Pro - Traduzione EX, quota mensile 100.000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Piano Premia - Traduzione EX, quota mensile 8M</value>
+    <value>Piano Premia - Traduzione EX, quota mensile 80.000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Piano Premium - Traduzione EX, quota mensile 20M</value>
+    <value>Piano Premium - Traduzione EX, quota mensile 200.000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Piano Ultimate - Traduzione EX, quota mensile 50M</value>
+    <value>Piano Ultimate - Traduzione EX, quota mensile 500.000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>Nessuna scadenza</value>
@@ -846,13 +846,13 @@
     <value>Piani disponibili:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/mese): Traduzione EX, quota mensile 10M</value>
+    <value>• Pro ($3/mese): Traduzione EX, quota mensile 100.000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/mese): Traduzione EX, quota mensile 20M</value>
+    <value>• Premium ($5/mese): Traduzione EX, quota mensile 200.000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/mese): Traduzione EX, quota mensile 50M</value>
+    <value>• Ultimate ($9/mese): Traduzione EX, quota mensile 500.000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Accedi</value>

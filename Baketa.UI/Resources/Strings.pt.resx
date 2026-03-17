@@ -752,16 +752,16 @@
     <value>Plano Padrão - Sem anúncios, apenas tradução padrão</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Plano Pro - Tradução EX, cota mensal de 10M</value>
+    <value>Plano Pro - Tradução EX, cota mensal de 100.000</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Plano Premia - Tradução EX, cota mensal de 8M</value>
+    <value>Plano Premia - Tradução EX, cota mensal de 80.000</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Plano Premium - Tradução EX, cota mensal de 20M</value>
+    <value>Plano Premium - Tradução EX, cota mensal de 200.000</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Plano Ultimate - Tradução EX, cota mensal de 50M</value>
+    <value>Plano Ultimate - Tradução EX, cota mensal de 500.000</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>Sem validade</value>
@@ -846,13 +846,13 @@
     <value>Planos disponíveis:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/mês): Tradução EX, cota mensal de 10M</value>
+    <value>• Pro ($3/mês): Tradução EX, cota mensal de 100.000</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/mês): Tradução EX, cota mensal de 20M</value>
+    <value>• Premium ($5/mês): Tradução EX, cota mensal de 200.000</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/mês): Tradução EX, cota mensal de 50M</value>
+    <value>• Ultimate ($9/mês): Tradução EX, cota mensal de 500.000</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Entrar</value>

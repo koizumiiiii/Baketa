@@ -752,16 +752,16 @@
     <value>Standard 플랜 - 광고 없음, 표준 번역만 지원</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro 플랜 - EX 번역, 월 1,000만 할당량</value>
+    <value>Pro 플랜 - EX 번역, 월 100,000 할당량</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premia 플랜 - EX 번역, 월 800만 할당량</value>
+    <value>Premia 플랜 - EX 번역, 월 80,000 할당량</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premium 플랜 - EX 번역, 월 2,000만 할당량</value>
+    <value>Premium 플랜 - EX 번역, 월 200,000 할당량</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimate 플랜 - EX 번역, 월 5,000만 할당량</value>
+    <value>Ultimate 플랜 - EX 번역, 월 500,000 할당량</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>만료 없음</value>
@@ -846,13 +846,13 @@
     <value>이용 가능한 플랜:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/월): EX 번역 월 1,000만 할당량</value>
+    <value>• Pro ($3/월): EX 번역 월 100,000 할당량</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/월): EX 번역 월 2,000만 할당량</value>
+    <value>• Premium ($5/월): EX 번역 월 200,000 할당량</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/월): EX 번역 월 5,000만 할당량</value>
+    <value>• Ultimate ($9/월): EX 번역 월 500,000 할당량</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>로그인</value>
