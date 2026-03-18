@@ -452,6 +452,20 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
             if (nonEmptyChunks.Count == 0)
             {
                 _logger.LogWarning("⚠️ [PHASE12.2] 翻訳可能なチャンクが0個 - 処理スキップ");
+
+                // [Issue #557] ローディング終了イベントを発火して「準備中」表示を解除
+                try
+                {
+                    await _eventAggregator.PublishAsync(
+                        new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent(),
+                        cancellationToken).ConfigureAwait(false);
+                    _logger.LogDebug("[Issue #557] チャンク0個のためローディング終了イベント発火");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(ex, "[Issue #557] ローディング終了イベント発火失敗（継続）");
+                }
+
                 return;
             }
 
@@ -474,6 +488,19 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
                 if (nonEmptyChunks.Count == 0)
                 {
                     _logger.LogInformation("🚪 [Issue #293] Gate判定: 全チャンクが変化なしと判定されスキップ");
+
+                    // [Issue #557] ローディング終了イベントを発火
+                    try
+                    {
+                        await _eventAggregator.PublishAsync(
+                            new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent(),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogDebug(ex, "[Issue #557] ローディング終了イベント発火失敗（継続）");
+                    }
+
                     return;
                 }
             }
