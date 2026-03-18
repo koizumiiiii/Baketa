@@ -879,6 +879,18 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
             _logger?.LogDebug($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
             Console.WriteLine($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
 
+            // [Issue #557] オーバーレイ表示直前にローディング終了イベントを発火
+            // 翻訳結果がユーザーに見える直前まで「準備中」を表示し続ける
+            try
+            {
+                await _eventAggregator.PublishAsync(new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent(), cancellationToken).ConfigureAwait(false);
+                _logger?.LogDebug("[Issue #557] オーバーレイ表示直前にローディング終了イベント発火");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "[Issue #557] ローディング終了イベント発火失敗（継続）");
+            }
+
 #if DEBUG
             // 🚨 [ULTRATHINK_TRACE3] オーバーレイ表示ループ開始直前トレースログ
             var timestamp3 = DateTime.Now.ToString("HH:mm:ss.fff");
