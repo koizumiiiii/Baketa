@@ -139,9 +139,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     public async Task UpdateTranslationSettingsAsync(ITranslationSettings settings, CancellationToken cancellationToken = default)
     {
         // 🔥 [Issue #189] selectedLanguagePair形式で保存（CreateTranslationSettingsFromUserと統一）
-        // 言語コードを小文字で保存（例: "en-ja"）
-        var sourceLang = settings.DefaultSourceLanguage?.ToLowerInvariant() ?? "en";
-        var targetLang = settings.DefaultTargetLanguage?.ToLowerInvariant() ?? "ja";
+        // 言語コードの大文字小文字を保持（zh-CN, zh-TWの正確な保存）
+        var sourceLang = settings.DefaultSourceLanguage ?? "en";
+        var targetLang = settings.DefaultTargetLanguage ?? "ja";
         var selectedLanguagePair = $"{sourceLang}-{targetLang}";
 
         var userSettings = new Dictionary<string, object>
@@ -541,19 +541,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
 
         if (!string.IsNullOrEmpty(languagePairString) && languagePairString.Contains('-'))
         {
-            // 🔥 "ja-en" 形式をパース（source-target）
-            var parts = languagePairString.Split('-', 2);
-            if (parts.Length == 2)
-            {
-                sourceLanguage = parts[0].Trim().ToLowerInvariant();
-                targetLanguage = parts[1].Trim().ToLowerInvariant();
-            }
-            else
-            {
-                // パース失敗時はデフォルト
-                sourceLanguage = "en";
-                targetLanguage = "ja";
-            }
+            // "source-target" 形式をパース
+            // zh-CN, zh-TW等のハイフン含み言語コードに対応
+            (sourceLanguage, targetLanguage) = ParseLanguagePair(languagePairString);
         }
         else
         {
@@ -702,6 +692,57 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         _disposed = true;
 
         _logger?.LogInformation("UnifiedSettingsServiceを破棄しました");
+    }
+
+    /// <summary>
+    /// 言語コードの大文字小文字を正規化（例: "zh-tw" → "zh-TW", "zh-cn" → "zh-CN"）
+    /// </summary>
+    private static string NormalizeLanguageCode(string code)
+    {
+        if (code.Contains('-'))
+        {
+            var parts = code.Split('-', 2);
+            return $"{parts[0].ToLowerInvariant()}-{parts[1].ToUpperInvariant()}";
+        }
+        return code.ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// "source-target" 形式の言語ペア文字列をパース
+    /// zh-CN, zh-TW等のハイフン含み言語コードに対応
+    /// 例: "zh-CN-ja" → ("zh-CN", "ja"), "en-zh-TW" → ("en", "zh-TW"), "ja-en" → ("ja", "en")
+    /// </summary>
+    private static (string Source, string Target) ParseLanguagePair(string pair)
+    {
+        // 既知のハイフン含み言語コードプレフィックス
+        string[] compoundCodes = ["zh-CN", "zh-TW", "zh-Hans", "zh-Hant"];
+
+        // ソース言語がハイフン含みコードで始まるかチェック
+        foreach (var code in compoundCodes)
+        {
+            if (pair.StartsWith(code + "-", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = pair[(code.Length + 1)..];
+                return (NormalizeLanguageCode(code), NormalizeLanguageCode(target));
+            }
+        }
+
+        // ターゲット言語がハイフン含みコードで終わるかチェック
+        foreach (var code in compoundCodes)
+        {
+            if (pair.EndsWith("-" + code, StringComparison.OrdinalIgnoreCase))
+            {
+                var source = pair[..(pair.Length - code.Length - 1)];
+                return (NormalizeLanguageCode(source), NormalizeLanguageCode(code));
+            }
+        }
+
+        // 通常のパース（ハイフン含みコードなし）
+        var parts = pair.Split('-', 2);
+        if (parts.Length == 2)
+            return (NormalizeLanguageCode(parts[0].Trim()), NormalizeLanguageCode(parts[1].Trim()));
+
+        return ("en", "ja");
     }
 }
 

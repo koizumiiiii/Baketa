@@ -880,28 +880,49 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     {
         if (_isUpdatingLanguages) return;
         _isUpdatingLanguages = true;
+
         try
         {
             var previousTarget = TargetLanguage;
-            AvailableTargetLanguages.Clear();
 
-            // ソース言語以外の全言語をターゲット言語として追加
-            foreach (var lang in AvailableLanguages)
+            // ソース言語を除外した新しいリストを構築
+            var newList = AvailableLanguages
+                .Where(lang => !string.Equals(lang, SourceLanguage, StringComparison.Ordinal))
+                .ToList();
+
+            // 差分更新（Clear→Addの代わりに、不要な項目を削除し足りない項目を追加）
+            // ComboBoxのSelectedItemがnullにリセットされるのを防ぐ
+            for (int i = AvailableTargetLanguages.Count - 1; i >= 0; i--)
             {
-                if (!string.Equals(lang, SourceLanguage, StringComparison.Ordinal))
-                {
+                if (!newList.Contains(AvailableTargetLanguages[i]))
+                    AvailableTargetLanguages.RemoveAt(i);
+            }
+            foreach (var lang in newList)
+            {
+                if (!AvailableTargetLanguages.Contains(lang))
                     AvailableTargetLanguages.Add(lang);
-                }
             }
 
-            // 現在の翻訳先言語が選択肢にある場合は維持、なければ最初の選択肢を選択
+            // ターゲット言語の選択
             if (AvailableTargetLanguages.Contains(previousTarget))
             {
+                // 維持
                 TargetLanguage = previousTarget;
             }
             else if (AvailableTargetLanguages.Count > 0)
             {
-                TargetLanguage = AvailableTargetLanguages.First();
+                // UI言語をデフォルトのターゲット言語として選択
+                var uiLang = _localizationService?.CurrentCulture?.TwoLetterISOLanguageName;
+                if (uiLang != null && AvailableTargetLanguages.Any(l =>
+                    l.StartsWith(uiLang, StringComparison.OrdinalIgnoreCase)))
+                {
+                    TargetLanguage = AvailableTargetLanguages.First(l =>
+                        l.StartsWith(uiLang, StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    TargetLanguage = AvailableTargetLanguages.First();
+                }
             }
         }
         finally

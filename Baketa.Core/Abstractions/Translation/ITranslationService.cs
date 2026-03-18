@@ -13,6 +13,12 @@ namespace Baketa.Core.Abstractions.Translation;
 public interface ITranslationService
 {
     /// <summary>
+    /// [Issue #542] テキスト翻訳（DeepL/Google Free）が設定済みかどうか
+    /// trueの場合、NLLBのプリロードをスキップしてメモリを節約可能
+    /// </summary>
+    bool HasTextTranslationFallback { get; }
+
+    /// <summary>
     /// 利用可能な翻訳エンジンを取得します
     /// </summary>
     /// <returns>利用可能な翻訳エンジンのコレクション</returns>
