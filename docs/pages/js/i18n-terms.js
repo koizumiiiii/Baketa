@@ -77,7 +77,7 @@ const TERMS_TRANSLATIONS = {
 
     article13_title: 'Article 13 (Governing Law and Jurisdiction)',
     article13_list1: 'These Terms shall be governed by and construed in accordance with Japanese law.',
-    article13_list2: 'In the event of any dispute arising in connection with the Service, the court having jurisdiction over the location of the operator\'s head office shall be the exclusive agreed jurisdiction.',
+    article13_list2: 'In the event of any dispute arising in connection with the Service, the court having jurisdiction over the location of the operator\'s head office shall be the exclusive agreed-upon jurisdiction.',
 
     footer_copyright: '&copy; 2025 Baketa. All rights reserved.',
     footer_updated: 'Last updated: November 27, 2025',
