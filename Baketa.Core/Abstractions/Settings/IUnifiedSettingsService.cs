@@ -134,6 +134,11 @@ public interface ITranslationSettings
     /// Pro/Premiaプランでのみ利用可能
     /// </summary>
     bool EnableCloudAiTranslation { get; }
+
+    /// <summary>
+    /// [Issue #554] EXモード自動ON済みフラグ
+    /// </summary>
+    bool ExModeAutoEnabled { get; }
 }
 
 /// <summary>

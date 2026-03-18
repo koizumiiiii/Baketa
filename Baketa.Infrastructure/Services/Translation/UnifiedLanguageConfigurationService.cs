@@ -177,4 +177,8 @@ internal sealed class TranslationSettingsImpl : ITranslationSettings
     /// [Issue #78 Phase 5] Cloud AI翻訳の有効化フラグ
     /// </summary>
     public bool EnableCloudAiTranslation { get; set; }
+    /// <summary>
+    /// [Issue #554] EXモード自動ON済みフラグ
+    /// </summary>
+    public bool ExModeAutoEnabled { get; set; }
 }

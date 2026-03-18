@@ -244,6 +244,7 @@ public class UserPlanService : IUserPlanService, IDisposable
         public int TimeoutMs => _baseSettings.TimeoutMs;
         public int OverlayFontSize => _baseSettings.OverlayFontSize;
         public bool EnableCloudAiTranslation => true; // 有効化
+        public bool ExModeAutoEnabled => _baseSettings.ExModeAutoEnabled;
     }
 
     /// <summary>

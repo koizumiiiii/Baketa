@@ -1127,7 +1127,11 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
         _logger?.LogDebug($"🎯🎯🎯 [PHASE12.2_BATCH] ExecuteBatchTranslationAsync メソッド開始 - ChunkCount: {chunks.Count}");
         Console.WriteLine($"🎯🎯🎯 [PHASE12.2_BATCH] ExecuteBatchTranslationAsync メソッド開始 - ChunkCount: {chunks.Count}");
 
-        var batchTexts = chunks.Select(c => c.CombinedText).ToList();
+        // [Issue #555] 近接グループ化で結合されたテキスト内の改行を除去
+        // OCRが複数行にわたるテキストを検出した場合、改行が残るがこれは
+        // 表示上の折り返しであり文の区切りではないため、翻訳API（DeepL/Google）が
+        // 別々の文として翻訳してしまう問題を防止する
+        var batchTexts = chunks.Select(c => c.CombinedText?.Replace("\n", "") ?? "").ToList();
 
         _logger?.LogDebug($"🎯 [PHASE12.2_BATCH] バッチテキスト作成完了 - テキスト数: {batchTexts.Count}");
 

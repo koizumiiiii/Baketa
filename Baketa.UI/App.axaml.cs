@@ -937,7 +937,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // 既にフラグが立っている場合（起動時に同期済み）
             if (bonusTokenService.WelcomeBonusJustGranted)
             {
-                ShowWelcomeBonusDialog(bonusTokenService);
+                ShowWelcomeBonusDialog(bonusTokenService, serviceProvider);
                 return;
             }
 
@@ -946,7 +946,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             {
                 if (bonusTokenService.WelcomeBonusJustGranted)
                 {
-                    ShowWelcomeBonusDialog(bonusTokenService);
+                    ShowWelcomeBonusDialog(bonusTokenService, serviceProvider);
                 }
             };
         }
@@ -958,7 +958,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
     private bool _welcomeBonusDialogShown;
 
-    private void ShowWelcomeBonusDialog(Baketa.Core.Abstractions.License.IBonusTokenService bonusTokenService)
+    private void ShowWelcomeBonusDialog(Baketa.Core.Abstractions.License.IBonusTokenService bonusTokenService, IServiceProvider serviceProvider)
     {
         // 複数回表示防止
         if (_welcomeBonusDialogShown) return;
@@ -969,12 +969,54 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
         _logger?.LogInformation("[Issue #545] ウェルカムボーナスダイアログ表示: Amount={Amount}", amount);
 
+        // [Issue #554] EXモード自動ON（一回限り）
+        AutoEnableExModeAsync(serviceProvider);
+
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
             var mainWindow = (Avalonia.Application.Current?.ApplicationLifetime as
                 Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
             await Views.WelcomeBonusWindow.ShowAsync(amount, mainWindow);
         });
+    }
+
+    /// <summary>
+    /// [Issue #554] ウェルカムボーナス付与時にEXモードを一度だけ自動ONにする
+    /// ユーザーが手動でON/OFFを変更済みの場合は何もしない
+    /// </summary>
+    private async void AutoEnableExModeAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var settingsService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
+            if (settingsService == null) return;
+
+            var currentSettings = settingsService.GetTranslationSettings();
+            if (currentSettings.ExModeAutoEnabled)
+            {
+                _logger?.LogDebug("[Issue #554] EXモード自動ON済み、スキップ");
+                return;
+            }
+
+            // UseLocalEngine=false（EXモードON）+ ExModeAutoEnabled=true（二度と自動変更しない）
+            var updatedSettings = new Baketa.Core.Settings.TranslationSettings
+            {
+                AutoDetectSourceLanguage = currentSettings.AutoDetectSourceLanguage,
+                DefaultSourceLanguage = currentSettings.DefaultSourceLanguage,
+                DefaultTargetLanguage = currentSettings.DefaultTargetLanguage,
+                UseLocalEngine = false,
+                ExModeAutoEnabled = true,
+                EnableCloudAiTranslation = true,
+                OverlayFontSize = currentSettings.OverlayFontSize,
+            };
+
+            await settingsService.UpdateTranslationSettingsAsync(updatedSettings).ConfigureAwait(false);
+            _logger?.LogInformation("[Issue #554] EXモード自動ON完了");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "[Issue #554] EXモード自動ON失敗（継続）");
+        }
     }
 
     /// <summary>

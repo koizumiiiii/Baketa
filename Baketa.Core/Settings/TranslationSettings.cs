@@ -147,6 +147,13 @@ public sealed class TranslationSettings : ITranslationSettings
     public bool UseLocalEngine { get; set; } = true;
 
     /// <summary>
+    /// [Issue #554] EXモード自動ON済みフラグ
+    /// ウェルカムボーナス付与時に一度だけEXモードを自動ONにするためのフラグ。
+    /// true の場合、自動ONは実行済みでありユーザーの手動設定が優先される。
+    /// </summary>
+    public bool ExModeAutoEnabled { get; set; }
+
+    /// <summary>
     /// 最大並列翻訳数
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "最大並列数",
@@ -477,6 +484,7 @@ public sealed class TranslationSettings : ITranslationSettings
             EnableCloudAiTranslation = EnableCloudAiTranslation,
             // [Issue #280+#281] ローカル翻訳エンジン設定
             UseLocalEngine = UseLocalEngine,
+            ExModeAutoEnabled = ExModeAutoEnabled,
             CacheRetentionHours = CacheRetentionHours,
             MaxCacheEntries = MaxCacheEntries,
             EncryptApiKeys = EncryptApiKeys,
