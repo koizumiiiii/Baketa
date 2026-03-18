@@ -109,7 +109,7 @@
   --transition-slow: 300ms ease;
 
   /* Container */
-  --container-sm: 640px;
+  --container-sm: 900px;
   --container-md: 768px;
   --container-lg: 1024px;
 }

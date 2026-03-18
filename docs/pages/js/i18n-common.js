@@ -53,7 +53,7 @@ function addLanguageSelector(currentLang) {
 
   const select = document.createElement('select');
   select.className = 'header__lang-select';
-  select.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,0.3);color:inherit;padding:4px 8px;border-radius:4px;font-size:13px;cursor:pointer;';
+  select.style.cssText = 'background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:4px 8px;border-radius:4px;font-size:13px;cursor:pointer;';
 
   const langNames = {
     'en': 'English', 'ja': '日本語', 'zh-CN': '简体中文', 'zh-TW': '繁體中文',
@@ -65,6 +65,8 @@ function addLanguageSelector(currentLang) {
     const option = document.createElement('option');
     option.value = code;
     option.textContent = langNames[code] || code;
+    option.style.color = '#333';
+    option.style.background = '#fff';
     if (code === currentLang) option.selected = true;
     select.appendChild(option);
   });
