@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /Baketa/pages/
+Disallow: /Baketa/pages/auth/
+
+Sitemap: https://koizumiiiii.github.io/Baketa/sitemap.xml
