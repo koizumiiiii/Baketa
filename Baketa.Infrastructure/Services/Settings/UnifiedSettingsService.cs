@@ -154,7 +154,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             ["timeoutMs"] = settings.TimeoutMs,
             ["overlayFontSize"] = settings.OverlayFontSize,
             // [Issue #243] Cloud AI翻訳設定を保存
-            ["enableCloudAiTranslation"] = settings.EnableCloudAiTranslation
+            ["enableCloudAiTranslation"] = settings.EnableCloudAiTranslation,
+            // [Issue #554] EXモード自動ON済みフラグ
+            ["exModeAutoEnabled"] = settings.ExModeAutoEnabled
         };
 
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
@@ -564,7 +566,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             GetIntValue(userSettings, "timeoutMs", appSettings.TimeoutSeconds * 1000),
             GetIntValue(userSettings, "overlayFontSize", 14),
             // [Issue #78 Phase 5] Cloud AI翻訳設定
-            GetBoolValue(userSettings, "enableCloudAiTranslation", appSettings.EnableCloudAiTranslation));
+            GetBoolValue(userSettings, "enableCloudAiTranslation", appSettings.EnableCloudAiTranslation),
+            // [Issue #554] EXモード自動ON済みフラグ
+            GetBoolValue(userSettings, "exModeAutoEnabled", false));
     }
 
     private static UnifiedOcrSettings CreateOcrSettingsFromUser(
@@ -759,7 +763,9 @@ internal sealed record UnifiedTranslationSettings(
     int TimeoutMs,
     int OverlayFontSize,
     // [Issue #78 Phase 5] Cloud AI翻訳の有効化フラグ
-    bool EnableCloudAiTranslation = true) : ITranslationSettings;
+    bool EnableCloudAiTranslation = true,
+    // [Issue #554] EXモード自動ON済みフラグ
+    bool ExModeAutoEnabled = false) : ITranslationSettings;
 
 /// <summary>
 /// 統一OCR設定実装
