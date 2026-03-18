@@ -11,4 +11,10 @@ public class FirstTranslationResultReceivedEvent : EventBase
 
     /// <inheritdoc />
     public override string Category => "Translation";
+
+    /// <summary>
+    /// [Issue #557] テキスト検出に失敗したかどうか
+    /// true の場合、翻訳可能なテキストが検出されなかった
+    /// </summary>
+    public bool NoTextDetected { get; init; }
 }

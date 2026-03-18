@@ -136,6 +136,9 @@
   <data name="MainOverlay_Preparing" xml:space="preserve">
     <value>Preparando</value>
   </data>
+  <data name="MainOverlay_NoTextDetected" xml:space="preserve">
+    <value>No se pudo detectar el texto. Inténtelo de nuevo.</value>
+  </data>
   <data name="MainOverlay_ShowTranslation" xml:space="preserve">
     <value>Mostrar traducción</value>
   </data>

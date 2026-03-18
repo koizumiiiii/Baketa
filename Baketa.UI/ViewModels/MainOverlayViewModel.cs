@@ -1987,7 +1987,7 @@ public class MainOverlayViewModel : ViewModelBase
     /// </summary>
     private async Task OnFirstTranslationResultReceived(FirstTranslationResultReceivedEvent evt)
     {
-        Logger?.LogWarning("🔔 [LOADING_END] FirstTranslationResultReceivedEvent受信! ID: {EventId}", evt.Id);
+        Logger?.LogWarning("🔔 [LOADING_END] FirstTranslationResultReceivedEvent受信! ID: {EventId}, NoTextDetected: {NoText}", evt.Id, evt.NoTextDetected);
 
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
@@ -2002,6 +2002,15 @@ public class MainOverlayViewModel : ViewModelBase
                 Logger?.LogWarning("⚠️ [LOADING_END] 既にIsLoading=false のため変更なし");
             }
         });
+
+        // [Issue #557] テキスト検出失敗時にユーザーへ通知
+        if (evt.NoTextDetected)
+        {
+            await _notificationService.ShowWarningAsync(
+                Strings.MainOverlay_Preparing,
+                Strings.MainOverlay_NoTextDetected,
+                5000).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

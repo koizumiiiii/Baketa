@@ -116,6 +116,7 @@ public static class Strings
     public static string MainOverlay_LiveTranslation => GetString("MainOverlay_LiveTranslation");
     public static string MainOverlay_ShotTranslation => GetString("MainOverlay_ShotTranslation");
     public static string MainOverlay_Preparing => GetString("MainOverlay_Preparing");
+    public static string MainOverlay_NoTextDetected => GetString("MainOverlay_NoTextDetected");
     public static string MainOverlay_ShowTranslation => GetString("MainOverlay_ShowTranslation");
     public static string MainOverlay_Settings => GetString("MainOverlay_Settings");
     public static string MainOverlay_Exit => GetString("MainOverlay_Exit");

@@ -136,6 +136,9 @@
   <data name="MainOverlay_Preparing" xml:space="preserve">
     <value>准备中</value>
   </data>
+  <data name="MainOverlay_NoTextDetected" xml:space="preserve">
+    <value>无法检测到文本，请重试。</value>
+  </data>
   <data name="MainOverlay_ShowTranslation" xml:space="preserve">
     <value>显示翻译</value>
   </data>

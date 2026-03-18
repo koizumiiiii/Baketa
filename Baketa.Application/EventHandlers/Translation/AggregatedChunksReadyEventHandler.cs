@@ -457,9 +457,9 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
                 try
                 {
                     await _eventAggregator.PublishAsync(
-                        new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent(),
+                        new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent { NoTextDetected = true },
                         cancellationToken).ConfigureAwait(false);
-                    _logger.LogDebug("[Issue #557] チャンク0個のためローディング終了イベント発火");
+                    _logger.LogDebug("[Issue #557] チャンク0個のためローディング終了イベント発火（NoTextDetected）");
                 }
                 catch (Exception ex)
                 {
@@ -493,7 +493,7 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
                     try
                     {
                         await _eventAggregator.PublishAsync(
-                            new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent(),
+                            new Baketa.Core.Events.EventTypes.FirstTranslationResultReceivedEvent { NoTextDetected = true },
                             cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception ex)
