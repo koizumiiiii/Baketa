@@ -508,12 +508,15 @@ public class DefaultTranslationService : ITranslationService
 
             return responses;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // ユーザー操作によるキャンセルのみ再スロー
             throw;
         }
         catch (Exception ex)
         {
+            // HttpClient.Timeoutによるタイムアウト（TaskCanceledException）も含め、
+            // テキスト翻訳の失敗は全てNLLBフォールバックに進む
             _logger.LogDebug(ex, "[Issue #542] テキスト翻訳バッチエラー → NLLBフォールバック");
             return null;
         }

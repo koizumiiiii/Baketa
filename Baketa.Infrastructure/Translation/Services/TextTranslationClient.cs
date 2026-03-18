@@ -26,7 +26,7 @@ public sealed class TextTranslationClient : IDisposable
         ILogger<TextTranslationClient> logger,
         string? baseUrl = null)
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         _logger = logger;
         _baseUrl = baseUrl ?? "https://baketa-relay.suke009.workers.dev";
     }
