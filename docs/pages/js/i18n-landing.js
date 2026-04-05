@@ -569,7 +569,8 @@ function updateDemoAsset(lang) {
   if (demoVideo) {
     const src = demoVideo.querySelector('source');
     if (src) {
-      src.src = `assets/demo/demo-${DEMO_LANG_MAP[lang] || lang}.mp4`;
+      const basePath = src.src.substring(0, src.src.lastIndexOf('/') + 1);
+      src.src = `${basePath}demo-${DEMO_LANG_MAP[lang] || lang}.mp4`;
       demoVideo.load();
     }
   }
