@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /pages/privacy-policy.html
+Allow: /pages/terms-of-service.html
+Disallow: /pages/auth/
+
+Sitemap: https://baketa.app/sitemap.xml
