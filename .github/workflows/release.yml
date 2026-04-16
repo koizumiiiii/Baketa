@@ -333,7 +333,7 @@ jobs:
         "@ | Out-File -FilePath "release_notes.md" -Encoding utf8
 
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         name: "Baketa ${{ steps.version.outputs.version }}"
         body_path: release_notes.md
