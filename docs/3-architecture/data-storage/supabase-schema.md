@@ -14,7 +14,7 @@ BaketaはSupabaseをバックエンドデータベースとして使用してい
 
 ## テーブル一覧
 
-### Public スキーマ (10テーブル)
+### Public スキーマ (11テーブル)
 
 | テーブル名 | 用途 | 主要な外部キー |
 |-----------|------|---------------|
@@ -27,6 +27,7 @@ BaketaはSupabaseをバックエンドデータベースとして使用してい
 | `promotion_codes` | プロモーションコードマスタ | - |
 | `promotion_code_redemptions` | コード使用履歴 | `user_id`, `promotion_code_id` |
 | `crash_reports` | クラッシュレポート | - (匿名) |
+| `keepalive` | Free tier自動pause防止用ping記録 | - |
 | `latest_consent_status` | 最新同意状態ビュー | - |
 
 ---

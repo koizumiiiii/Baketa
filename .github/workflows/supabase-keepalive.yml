@@ -1,14 +1,31 @@
 # Supabase Free tierの自動pause防止用キープアライブ
-# 数日おきにDBへ軽いリクエストを送り「活動あり」状態を維持してauto-pauseを防ぐ
+#
+# 公式基準 (https://supabase.com/docs/guides/platform/free-project-pausing):
+#   "A Free plan project is considered inactive if it does not receive
+#    sufficient user database activity over the past week."
+#   "Typically a few user requests to the database each day over the
+#    previous week is enough to keep the project from being paused."
+#
+# → 「毎日数回」を満たすため1日3回実行する。
+#   （旧設定の2日おき1回=週3〜4回では活動不足と判定され、pause予告が届いた）
+#
+# cronの分は毎時0分を避ける（GitHubのscheduleは毎時0分付近が混雑し遅延・
+# ドロップしやすいと公式に明記されているため）。
+#
+# 前提: docs/database/keepalive.sql を Supabase SQL Editor で実行済みであること
+#       （public.keepalive テーブルと public.keepalive_ping() RPC が必要）
+#
+# 注意: public リポジトリでは60日間リポジトリ活動がないと schedule が自動無効化される
+#
 # Required GitHub Secrets:
-# - SUPABASE_URL                   例: https://<project-ref>.supabase.co
-# - SUPABASE_SERVICE_ROLE_KEY      anon(public)キーでも可。疎通できればpause回避目的は達成される
+# - SUPABASE_URL                   https://kajsoietcikivrwidqcs.supabase.co
+# - SUPABASE_SERVICE_ROLE_KEY      実体は anon(public) キー。RPCはSECURITY DEFINERのため anon で十分
 
 name: Supabase Keepalive
 
 on:
   schedule:
-    - cron: "0 3 */2 * *"
+    - cron: "17 1,9,17 * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,23 +34,80 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Request profiles table
+      - name: Verify target project
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
 
-          status_code="$(
-            curl --silent --show-error --output /dev/null \
-              --write-out "%{http_code}" \
-              --header "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-              --header "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-              "${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1"
-          )"
+          expected_host="kajsoietcikivrwidqcs.supabase.co"
 
-          echo "Supabase keepalive HTTP status: ${status_code}"
-
-          if [[ ! "${status_code}" =~ ^2[0-9][0-9]$ ]]; then
+          if [[ -z "${SUPABASE_URL:-}" ]]; then
+            echo "::error::SUPABASE_URL secret is not set"
             exit 1
           fi
+
+          # scheme と host を厳密に照合（部分一致では別プロジェクトを見逃すため）
+          if [[ "${SUPABASE_URL%/}" != "https://${expected_host}" ]]; then
+            echo "::error::SUPABASE_URL secret does not point to https://${expected_host}"
+            exit 1
+          fi
+
+          echo "Target project verified: https://${expected_host}"
+
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+
+          base="${SUPABASE_URL%/}"
+          failed=0
+
+          ping() {
+            local label="$1" method="$2" path="$3" body="${4:-}"
+            local args=(
+              --fail-with-body
+              --silent --show-error
+              --output /tmp/response.txt
+              --write-out "%{http_code}"
+              --max-time 30
+              --request "${method}"
+              --header "apikey: ${SUPABASE_KEY}"
+              --header "Authorization: Bearer ${SUPABASE_KEY}"
+            )
+
+            if [[ -n "${body}" ]]; then
+              args+=(--header "Content-Type: application/json" --data "${body}")
+            fi
+
+            local status=0
+            status="$(curl "${args[@]}" "${base}${path}")" || true
+
+            echo "[${label}] HTTP ${status} :: $(head -c 200 /tmp/response.txt)"
+
+            if [[ ! "${status}" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::${label} failed with HTTP ${status}"
+              failed=1
+              return 1
+            fi
+          }
+
+          # 1. 書き込みping（DBへのuser queryであることが最も明確。監査記録も兼ねる）
+          if ping "write-rpc" POST "/rest/v1/rpc/keepalive_ping" "{}"; then
+            # HTTP 200でも意図した更新が起きていない可能性があるため中身を検証する
+            # keepalive_ping() は更新後の last_ping_at (timestamptz) を返す
+            if ! grep -qE '^"[0-9]{4}-[0-9]{2}-[0-9]{2}T' /tmp/response.txt; then
+              echo "::error::write-rpc returned HTTP 200 but the payload is not a timestamp"
+              failed=1
+            fi
+          fi
+
+          # 2. 読み取りping
+          ping "read-profiles" GET "/rest/v1/profiles?select=id&limit=1" || true
+
+          # 3. Auth疎通ping（到達性の確認用。pause判定に効くかは不明なので副次的な位置づけ）
+          ping "auth-health" GET "/auth/v1/health" || true
+
+          exit "${failed}"
