@@ -39,6 +39,7 @@ These files contain the following critical settings:
 - `ui-layer.md` - Avalonia UI / ReactiveUI 固有ルール
 - `test-files.md` - テストファイル固有ルール
 - `config-files.md` - 設定ファイル編集時の注意事項
+- `database-migrations.md` - Supabase SQLマイグレーション編集時のルール (GRANT必須化)
 
 #### カスタムコマンド (`.claude/commands/`)
 `/コマンド名` で呼び出せるショートカット:

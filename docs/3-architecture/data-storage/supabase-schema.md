@@ -374,8 +374,55 @@ CREATE POLICY "Users can update own profile"
 
 ---
 
+## マイグレーション運用ルール
+
+### 新規テーブル作成時のGRANT必須化（2026-10-30以降）
+
+Supabaseの破壊的変更により、**2026-10-30以降**に`public`スキーマで新規作成されたテーブルは、明示的な`GRANT`がないとData API（PostgREST/GraphQL/supabase-js）から不可視になります。Baketaは Relay Server (`relay-server/src/*.ts`) が`supabase-js`経由でテーブルにアクセスしているため、影響を受けます。
+
+参照: [Supabase Discussion #45329](https://github.com/orgs/supabase/discussions/45329)
+
+**新規テーブル追加時は必ず以下のテンプレートに従うこと:**
+
+```sql
+-- ① テーブル作成
+CREATE TABLE public.your_table (...);
+
+-- ② 明示的GRANT（必須・2026-10-30以降のデフォルト変更に対応）
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.your_table TO service_role;
+-- 必要に応じて authenticated / anon も
+-- GRANT SELECT ON public.your_table TO authenticated;
+
+-- シーケンスを使う場合は usage,select も付与
+-- GRANT USAGE, SELECT ON SEQUENCE public.your_table_id_seq TO service_role;
+
+-- ③ RLS有効化
+ALTER TABLE public.your_table ENABLE ROW LEVEL SECURITY;
+
+-- ④ ポリシー
+CREATE POLICY "..." ON public.your_table FOR ... TO ... USING (...);
+```
+
+**チェックリスト（PR時に確認）:**
+
+- [ ] `docs/database/*.sql` に新規テーブル定義を配置したか
+- [ ] 該当ロール（`service_role` / `authenticated` / `anon`）に対する`GRANT`文を含めたか
+- [ ] RLS有効化とポリシー定義を含めたか
+- [ ] シーケンスがある場合は`USAGE, SELECT`の`GRANT`を付与したか
+
+**既存テーブルへの影響:**
+
+既存テーブルは現在の`GRANT`設定が維持されるため、2026-10-30以降も動作継続します。**新規テーブル作成時のみ**注意が必要です。
+
+**緊急時の対応:**
+
+`permission denied for table`エラーが発生した場合、Supabase SQL Editor で対象テーブルに`GRANT`を実行することで即座に復旧可能。PostgRESTエラーレスポンスの`hint`フィールドに必要な`GRANT`文が表示されます。
+
+---
+
 ## 関連ドキュメント
 
 - [Cloudflare KV スキーマ](./cloudflare-kv-schema.md)
 - [認証フロー](../auth/authentication-flow.md)
+- [Supabase Breaking Change #45329](https://github.com/orgs/supabase/discussions/45329) - 2026-10-30以降のData API公開挙動変更
 - [外部サービス連携](../external-services.md)
