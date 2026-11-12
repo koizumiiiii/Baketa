@@ -313,7 +313,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
     #region License State Change Tests
 
     [Fact]
-    public void OnLicenseStateChanged_WhenUpgradedToPro_AutoEnablesCloudTranslation()
+    public void OnLicenseStateChanged_WhenUpgradedToPro_PreservesLocalEnginePreference()
     {
         // Arrange
         var service = CreateService();
@@ -328,12 +328,15 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Act
         _mockLicenseManager.Raise(x => x.StateChanged += null, _mockLicenseManager.Object, eventArgs);
 
-        // Assert: 自動的にSetPreferredAsync(true)が呼ばれる
+        // An entitlement change must not override the user's existing local preference.
+        Assert.True(service.IsEntitled);
+        Assert.False(service.IsPreferred);
+        Assert.False(service.IsEffectivelyEnabled);
         _mockUnifiedSettingsService.Verify(
             x => x.UpdateTranslationSettingsAsync(
-                It.Is<TranslationSettings>(s => s.EnableCloudAiTranslation == true),
+                It.IsAny<TranslationSettings>(),
                 It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]
@@ -373,9 +376,11 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
     }
 
     [Fact]
-    public void OnLicenseStateChanged_WhenPromotionApplied_AutoEnablesAndFiresEvent()
+    public void OnLicenseStateChanged_WhenPromotionAppliedAndCloudPreferred_EnablesAndFiresEvent()
     {
         // Arrange
+        _translationSettings.UseLocalEngine = false;
+        _translationSettings.EnableCloudAiTranslation = true;
         var service = CreateService();
 
         var oldState = new LicenseState { CurrentPlan = PlanType.Free };
@@ -390,14 +395,12 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Act
         _mockLicenseManager.Raise(x => x.StateChanged += null, _mockLicenseManager.Object, eventArgs);
 
-        // Assert: プロモーション適用時、自動的にCloud翻訳が有効化される
-        // 最終的なイベント理由は UserPreferenceChanged（SetPreferredAsync経由での有効化のため）
+        // Cloud was already preferred; only the entitlement changes.
         Assert.NotNull(receivedArgs);
         Assert.True(receivedArgs.IsEnabled);
         Assert.True(receivedArgs.IsEntitled);
         Assert.True(receivedArgs.IsPreferred);
-        // 注: 理由は UserPreferenceChanged になる（自動有効化はSetPreferredAsync経由）
-        Assert.Equal(CloudTranslationChangeReason.UserPreferenceChanged, receivedArgs.Reason);
+        Assert.Equal(CloudTranslationChangeReason.PromotionApplied, receivedArgs.Reason);
     }
 
     #endregion
@@ -498,9 +501,11 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
     #region Integration Scenario Tests
 
     [Fact]
-    public async Task Scenario_FreeUserUpgradesToPro_CloudTranslationAutoEnabled()
+    public void Scenario_FreeUserUpgradesToPro_CloudPreferenceBecomesEffective()
     {
         // Arrange: Freeユーザーとして開始
+        _translationSettings.UseLocalEngine = false;
+        _translationSettings.EnableCloudAiTranslation = true;
         var service = CreateService();
         Assert.False(service.IsEffectivelyEnabled);
 
@@ -512,13 +517,14 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _mockLicenseManager.Raise(x => x.StateChanged += null, _mockLicenseManager.Object, eventArgs);
 
-        // Assert: Cloud翻訳が自動有効化される
+        // The existing cloud preference becomes effective without rewriting settings.
         Assert.True(service.IsEntitled);
+        Assert.True(service.IsEffectivelyEnabled);
         _mockUnifiedSettingsService.Verify(
             x => x.UpdateTranslationSettingsAsync(
-                It.Is<TranslationSettings>(s => s.EnableCloudAiTranslation == true),
+                It.IsAny<TranslationSettings>(),
                 It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]

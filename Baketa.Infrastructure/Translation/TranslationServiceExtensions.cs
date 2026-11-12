@@ -38,18 +38,15 @@ public static class TranslationServiceExtensions
         services.AddSingleton<MockTranslationEngine>();
 #endif
 
-        // [Issue #542] テキスト翻訳クライアント（DeepL/Google Free）
-        services.AddSingleton<Services.TextTranslationClient>();
 
-        // 翻訳サービスを登録（TextTranslationClientを明示的に注入）
+        // Register local translation without a Relay client.
         services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<DefaultTranslationService>>();
             var engines = sp.GetServices<Baketa.Core.Abstractions.Translation.ITranslationEngine>();
             var configuration = sp.GetRequiredService<IConfiguration>();
             var eventAggregator = sp.GetService<Baketa.Core.Abstractions.Events.IEventAggregator>();
-            var textTranslationClient = sp.GetService<Services.TextTranslationClient>();
-            return new DefaultTranslationService(logger, engines, configuration, eventAggregator, textTranslationClient);
+            return new DefaultTranslationService(logger, engines, configuration, eventAggregator);
         });
 
         return services;

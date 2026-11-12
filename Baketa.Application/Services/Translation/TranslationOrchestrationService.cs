@@ -713,7 +713,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         try
         {
             // ローカル翻訳モードならアンロードしない
-            if (IsUseLocalEngine())
+            if (_unifiedSettingsService?.GetTranslationSettings().UseLocalEngine ?? true)
             {
                 return;
             }
@@ -806,35 +806,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             await engine.UnloadModelsAsync().ConfigureAwait(false);
             _logger?.LogInformation("Cloudモードに切替 → {EngineName} モデルをアンロード", engine.Name);
-        }
-    }
-
-    /// <summary>
-    /// translation-settings.json から UseLocalEngine を読み取る
-    /// </summary>
-    private static bool IsUseLocalEngine()
-    {
-        try
-        {
-            var settingsPath = BaketaSettingsPaths.TranslationSettingsPath;
-            if (!File.Exists(settingsPath))
-            {
-                return true; // デフォルトはローカル
-            }
-
-            var json = File.ReadAllText(settingsPath);
-            using var doc = JsonDocument.Parse(json);
-
-            if (doc.RootElement.TryGetProperty("useLocalEngine", out var value))
-            {
-                return value.GetBoolean();
-            }
-
-            return true; // プロパティ未設定時はローカル
-        }
-        catch
-        {
-            return true; // エラー時はローカルと見なしてアンロードしない
         }
     }
 

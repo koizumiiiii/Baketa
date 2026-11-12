@@ -24,22 +24,16 @@ public sealed class AuthModule : ServiceModuleBase
     /// <param name="services">Service collection</param>
     public override void RegisterServices(IServiceCollection services)
     {
-        var environment = BaketaEnvironment.Production; // TODO: Get from configuration
-
-        // Core authentication services
-        RegisterAuthenticationServices(services);
-
-        // User management services
-        RegisterUserServices(services);
-
-        // Authentication configuration
-        RegisterAuthConfiguration(services);
-
-        // Background services
-        RegisterBackgroundServices(services);
-
-        // Environment-specific services
-        RegisterEnvironmentSpecificServices(services, environment);
+        // The legacy registration methods remain for reference, but are never invoked.
+        services.AddSingleton<NullAuthService>();
+        services.AddSingleton<IAuthService>(provider => provider.GetRequiredService<NullAuthService>());
+        services.AddSingleton<IUserService>(provider => provider.GetRequiredService<NullAuthService>());
+        services.AddSingleton<IOAuthCallbackHandler>(provider => provider.GetRequiredService<NullAuthService>());
+        services.AddSingleton<IJwtTokenService>(provider => provider.GetRequiredService<NullAuthService>());
+        services.AddSingleton<ITokenAuditLogger, FileTokenAuditLogger>();
+        services.AddSingleton<ITokenExpirationHandler, TokenExpirationHandler>();
+        services.AddSingleton<IPasswordStrengthValidator, PasswordStrengthValidator>();
+        services.AddHostedService<LocalCredentialMigrationService>();
     }
 
     /// <summary>

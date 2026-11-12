@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -34,25 +32,17 @@ public sealed partial class CrashReportService : ICrashReportService
     };
 
     /// <summary>
-    /// [Issue #287] 静的HttpClientは非推奨
-    /// ICrashReportSenderが注入されていない場合のフォールバック用に残す
-    /// </summary>
-    [Obsolete("ICrashReportSender経由でのJWT認証付き送信を使用してください")]
-    private static readonly HttpClient SharedHttpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(30)
-    };
-
-    /// <summary>
     /// CrashReportServiceを初期化
     /// </summary>
     /// <param name="logger">ロガー（オプション）</param>
     /// <param name="ringBuffer">リングバッファロガー（nullの場合はシングルトンを使用）</param>
     /// <param name="sender">[Issue #287] クラッシュレポート送信サービス（JWT認証付き）</param>
+    /// <param name="reportsDirectory">Optional isolated storage directory.</param>
     public CrashReportService(
         ILogger<CrashReportService>? logger = null,
         RingBufferLogger? ringBuffer = null,
-        ICrashReportSender? sender = null)
+        ICrashReportSender? sender = null,
+        string? reportsDirectory = null)
     {
         _logger = logger;
         _ringBuffer = ringBuffer ?? RingBufferLogger.Instance;
@@ -60,14 +50,16 @@ public sealed partial class CrashReportService : ICrashReportService
         _startTime = DateTime.UtcNow;
 
         // [Issue #252] BaketaSettingsPathsを使用してパスを一元管理
-        _reportsDirectory = Settings.BaketaSettingsPaths.CrashReportsDirectory;
-        _crashPendingFlagPath = Settings.BaketaSettingsPaths.CrashPendingFlagPath;
+        _reportsDirectory = reportsDirectory ?? Settings.BaketaSettingsPaths.CrashReportsDirectory;
+        _crashPendingFlagPath = reportsDirectory is null
+            ? Settings.BaketaSettingsPaths.CrashPendingFlagPath
+            : Path.Combine(reportsDirectory, ".crash_pending");
 
         EnsureDirectoryExists();
 
         if (_sender != null)
         {
-            _logger?.LogInformation("[Issue #287] CrashReportSender injected - using JWT authentication");
+            _logger?.LogInformation("Crash report sender configured");
         }
     }
 
@@ -288,120 +280,10 @@ public sealed partial class CrashReportService : ICrashReportService
                 .ConfigureAwait(false);
         }
 
-        // フォールバック: 静的HttpClient使用（JWT認証なし）
-        _logger?.LogWarning("[Issue #287] ICrashReportSender not available, using legacy HttpClient");
-#pragma warning disable CS0618 // 意図的なフォールバック: ICrashReportSenderが注入されていない場合のレガシー送信
-        return await SendCrashReportLegacyAsync(report, includeSystemInfo, includeLogs, cancellationToken)
-            .ConfigureAwait(false);
-#pragma warning restore CS0618
+        // Missing DI must never reactivate the retired HTTP transport.
+        _logger?.LogDebug("Crash report upload is disabled without a sender");
+        return false;
     }
-
-    /// <summary>
-    /// [Issue #287] レガシー送信メソッド（後方互換性のため維持）
-    /// ICrashReportSenderが注入されていない場合に使用
-    /// </summary>
-    [Obsolete("ICrashReportSender経由でのJWT認証付き送信を使用してください")]
-    private async Task<bool> SendCrashReportLegacyAsync(
-        CrashReport report,
-        bool includeSystemInfo,
-        bool includeLogs,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var exception = report.Exception;
-            var stackTrace = exception.StackTrace;
-
-            if (string.IsNullOrEmpty(stackTrace))
-            {
-                var innerTraces = new List<string>();
-                var currentException = exception.InnerException;
-
-                while (currentException != null)
-                {
-                    if (!string.IsNullOrEmpty(currentException.StackTrace))
-                    {
-                        innerTraces.Add(currentException.StackTrace);
-                    }
-                    currentException = currentException.InnerException;
-                }
-
-                if (innerTraces.Count > 0)
-                {
-                    stackTrace = string.Join(
-                        $"{Environment.NewLine}--- End of Inner Exception Stack Trace ---{Environment.NewLine}",
-                        innerTraces);
-                }
-            }
-
-            var requestBody = new Dictionary<string, object?>
-            {
-                ["report_id"] = report.ReportId,
-                ["crash_timestamp"] = report.CrashedAt.ToString("O"),
-                ["error_message"] = report.Exception.Message,
-                ["stack_trace"] = stackTrace,
-                ["app_version"] = report.BaketaVersion,
-                ["os_version"] = report.SystemInfo.OsVersion,
-                ["include_system_info"] = includeSystemInfo,
-                ["include_logs"] = includeLogs
-            };
-
-            if (includeSystemInfo)
-            {
-                requestBody["system_info"] = new Dictionary<string, object?>
-                {
-                    ["cpu"] = $"{report.SystemInfo.ProcessorCount} cores",
-                    ["ram_mb"] = report.SystemInfo.WorkingSetBytes / 1024 / 1024,
-                    ["dotnet_version"] = report.SystemInfo.ClrVersion,
-                    ["is_64bit"] = report.SystemInfo.Is64BitProcess
-                };
-            }
-
-            if (includeLogs && report.RecentLogs.Count > 0)
-            {
-                requestBody["logs"] = string.Join(Environment.NewLine, report.RecentLogs);
-            }
-
-            var json = JsonSerializer.Serialize(requestBody, JsonOptions);
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-#pragma warning disable CS0618 // Obsolete
-            using var request = new HttpRequestMessage(HttpMethod.Post, CrashReportEndpointUrl)
-            {
-                Content = content
-            };
-
-            var response = await SharedHttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-#pragma warning restore CS0618
-
-            if (response.IsSuccessStatusCode)
-            {
-                _logger?.LogInformation("[Issue #252] クラッシュレポート送信成功: {ReportId}", report.ReportId);
-                return true;
-            }
-
-            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            _logger?.LogWarning(
-                "[Issue #252] クラッシュレポート送信失敗: StatusCode={StatusCode}, Body={Body}",
-                response.StatusCode, errorBody);
-            return false;
-        }
-        catch (TaskCanceledException)
-        {
-            _logger?.LogWarning("[Issue #252] クラッシュレポート送信タイムアウト: {ReportId}", report.ReportId);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "[Issue #252] クラッシュレポート送信エラー: {ReportId}", report.ReportId);
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// クラッシュレポート送信先エンドポイント（レガシー用）
-    /// </summary>
-    private const string CrashReportEndpointUrl = "https://api.baketa.app/api/crash-report";
 
     /// <inheritdoc />
     public Task DeleteCrashReportAsync(string reportId)

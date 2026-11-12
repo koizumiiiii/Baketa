@@ -113,15 +113,10 @@ public sealed class DirectOpenAIImageTranslator : ICloudImageTranslator
 
         var startTime = DateTime.UtcNow;
 
-        // デバッグ: 使用中のAPIキーの先頭を出力
-        var keyPreview = _settings.DirectOpenAIApiKey?.Length > 20
-            ? _settings.DirectOpenAIApiKey[..20] + "..."
-            : "(empty or short)";
         _logger.LogDebug(
-            "Direct OpenAI翻訳開始: RequestId={RequestId}, Target={Target}, KeyPreview={KeyPreview}",
+            "Direct OpenAI translation started: RequestId={RequestId}, Target={Target}",
             request.RequestId,
-            request.TargetLanguage,
-            keyPreview);
+            request.TargetLanguage);
 
         try
         {

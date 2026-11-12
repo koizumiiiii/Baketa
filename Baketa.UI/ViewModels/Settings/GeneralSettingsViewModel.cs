@@ -287,7 +287,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     public bool UseLocalEngine
     {
         get => _useLocalEngine;
-        set => this.RaiseAndSetIfChanged(ref _useLocalEngine, value);
+        set => this.RaiseAndSetIfChanged(ref _useLocalEngine, true);
     }
 
     /// <summary>
@@ -296,8 +296,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <remarks>
     /// [Issue #280+#281] LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
     /// </remarks>
-    public bool IsCloudTranslationEnabled =>
-        _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
+    public bool IsCloudTranslationEnabled => false;
 
     /// <summary>
     /// クラウド翻訳の注記テキスト（プランに応じて表示）
@@ -659,12 +658,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _targetLanguage = settings.DefaultTargetLanguage ?? "ja";
         _fontSize = settings.OverlayFontSize;
 
-        // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
-        // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
-        var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
-
-        // Cloud利用不可なら強制的にローカル翻訳
-        _useLocalEngine = !isCloudAvailable || settings.UseLocalEngine;
+        // Ignore persisted cloud-mode settings in the local-only release.
+        _useLocalEngine = true; // Phase 1 always uses the local translation engine.
     }
 
     /// <summary>
@@ -1034,8 +1029,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             // [Issue #78 Phase 5] + [Issue #280+#281] Cloud AI翻訳設定を反映
             // UseLocalEngine=true(ローカル翻訳) → EnableCloudAiTranslation=false
             // UseLocalEngine=false(AI翻訳) → EnableCloudAiTranslation=true
-            settings.EnableCloudAiTranslation = !UseLocalEngine;
-            settings.UseLocalEngine = UseLocalEngine;
+            settings.EnableCloudAiTranslation = false;
+            settings.UseLocalEngine = true;
             return settings;
         }
     }

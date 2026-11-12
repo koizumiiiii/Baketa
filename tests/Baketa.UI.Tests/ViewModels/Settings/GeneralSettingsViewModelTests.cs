@@ -49,6 +49,32 @@ public class GeneralSettingsViewModelTests
     }
 
     [Fact]
+    public void CurrentTranslationSettings_WithSavedCloudMode_UsesLocalEngineWithoutCloud()
+    {
+        // Arrange
+        var settings = new TranslationSettings { UseLocalEngine = false, EnableCloudAiTranslation = true };
+        var license = new Mock<Baketa.Core.Abstractions.License.ILicenseManager>();
+        license.SetupGet(x => x.CurrentState).Returns(new Baketa.Core.License.Models.LicenseState
+        {
+            CurrentPlan = Baketa.Core.License.Models.PlanType.Ultimate
+        });
+        license.Setup(x => x.IsFeatureAvailable(It.IsAny<Baketa.Core.License.Models.FeatureType>())).Returns(true);
+        using var viewModel = new GeneralSettingsViewModel(
+            _testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object,
+            translationSettings: settings, licenseManager: license.Object);
+
+        // Act
+        viewModel.UseLocalEngine = false;
+        var current = viewModel.CurrentTranslationSettings;
+
+        // Assert
+        viewModel.UseLocalEngine.Should().BeTrue();
+        viewModel.IsCloudTranslationEnabled.Should().BeFalse();
+        current.UseLocalEngine.Should().BeTrue();
+        current.EnableCloudAiTranslation.Should().BeFalse();
+    }
+
+    [Fact]
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert

@@ -48,7 +48,8 @@ public class DefaultTranslationService : ITranslationService
         _availableEngines = engines?.ToList() ?? throw new ArgumentNullException(nameof(engines));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _eventAggregator = eventAggregator;
-        _textTranslationClient = textTranslationClient;
+        // Retain the optional argument for source compatibility, but never use Relay.
+        _textTranslationClient = null;
 
         Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService作成 - エンジン数: {_availableEngines.Count}");
         _logger.LogInformation("DefaultTranslationService作成 - エンジン数: {Count}", _availableEngines.Count);
