@@ -46,6 +46,9 @@ public static class SettingsModule
                 logger);
         });
 
+        services.AddTransient<GeminiSettingsViewModel>();
+        services.AddSingleton<Core.Abstractions.Translation.IGeminiNotificationService, GeminiNotificationService>();
+
         // 一般設定ViewModel（ランタイム設定を読み込むファクトリ登録）
         services.AddTransient<GeneralSettingsViewModel>(provider =>
         {
@@ -95,7 +98,8 @@ public static class SettingsModule
                 licenseManager,
                 bonusTokenService,
                 unifiedSettingsService,
-                tokenTracker);
+                tokenTracker,
+                provider.GetRequiredService<GeminiSettingsViewModel>());
         });
 
         // アカウント設定ViewModel

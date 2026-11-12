@@ -29,6 +29,64 @@ namespace Baketa.Application.Tests.EventHandlers.Translation;
 /// </summary>
 public class AggregatedChunksReadyEventHandlerTests
 {
+    [Theory]
+    [InlineData(2000, 1500, 2000, 1500, 400, 150, 400, 300)]
+    [InlineData(800, 600, 2000, 1500, 400, 150, 400, 300)]
+    [InlineData(768, 432, 1920, 1080, 384, 108, 384, 216)]
+    public async Task CreateCloudDrivenOverlayItems_GeminiResponse_MatchesOcrAtOriginalImageCoordinates(
+        int sentWidth, int sentHeight, int imageWidth, int imageHeight,
+        int expectedX, int expectedY, int expectedWidth, int expectedHeight)
+    {
+        // Different OCR text prevents text matching from hiding a coordinate regression.
+        var expected = new DrawingRectangle(expectedX, expectedY, expectedWidth, expectedHeight);
+        var chunks = new List<TextChunk>
+        {
+            new() { ChunkId = 1, TextResults = [], CombinedText = "OCR-only text",
+                CombinedBounds = expected, SourceWindowHandle = IntPtr.Zero }
+        };
+        using var httpHandler = new GeminiResponseHandler();
+        var factory = new Mock<System.Net.Http.IHttpClientFactory>();
+        factory.Setup(x => x.CreateClient(It.IsAny<string>()))
+            .Returns(() => new System.Net.Http.HttpClient(httpHandler, false));
+        var settings = new Mock<IGeminiSettingsService>();
+        settings.SetupGet(x => x.HasApiKey).Returns(true);
+        settings.SetupGet(x => x.PreferGemini).Returns(true);
+        settings.SetupGet(x => x.Model).Returns("gemini-flash-lite-latest");
+        settings.Setup(x => x.GetApiKey()).Returns("test-only-credential");
+        await using var translator = new Baketa.Infrastructure.Translation.Cloud.GeminiImageTranslator(factory.Object, settings.Object);
+        var response = await translator.TranslateImageAsync(
+            Baketa.Core.Translation.Abstractions.ImageTranslationRequest.FromBytes([1], "ja", "en", sentWidth, sentHeight));
+        Assert.True(response.IsSuccess);
+        Assert.Equal(new Baketa.Core.Models.Int32Rect(200, 100, 200, 200), Assert.Single(response.Texts!).BoundingBox);
+
+        var handler = CreateMinimalHandler(out _);
+        var method = typeof(AggregatedChunksReadyEventHandler).GetMethod("CreateCloudDrivenOverlayItems",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var result = ((List<TextChunk> overlayChunks, List<string> translations))method.Invoke(
+            handler, [chunks, response.Texts, imageWidth, imageHeight])!;
+
+        Assert.Equal(expected, Assert.Single(result.overlayChunks).CombinedBounds);
+        Assert.Equal("こんにちは", Assert.Single(result.translations));
+    }
+
+    private sealed class GeminiResponseHandler : System.Net.Http.HttpMessageHandler
+    {
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(
+            System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var body = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                candidates = new[] { new { finishReason = "STOP", content = new { parts = new[] { new { text = """
+                    {"texts":[{"is_legible":true,"original":"Hello","translation":"こんにちは","bounding_box":[100,200,300,400],"confidence_score":0.95}]}
+                    """ } } } } }
+            });
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new System.Net.Http.StringContent(body)
+            });
+        }
+    }
+
     // ========================================================
     // ClipToSuryaBounds テスト（internal staticメソッド直接テスト）
     // ========================================================

@@ -1761,13 +1761,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             return false;
         }
 
-        // ライセンスマネージャーが必要
-        if (_licenseManager == null)
-        {
-            _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: LicenseManager未登録");
-            return false;
-        }
-
         // Cloud翻訳可用性サービスでの判定（優先）
         if (_cloudTranslationAvailabilityService != null)
         {
@@ -1783,7 +1776,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         else
         {
             // フォールバック: 旧ロジック（ICloudTranslationAvailabilityService未登録時）
-            if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
+            if (_licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) != true)
             {
                 _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: CloudAiTranslation機能が無効");
                 return false;
@@ -1802,14 +1795,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         if (string.IsNullOrEmpty(imageBase64) || contextWidth <= 0 || contextHeight <= 0)
         {
             _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: 画像データなし");
-            return false;
-        }
-
-        // セッショントークンが必要
-        var sessionId = _licenseManager.CurrentState.SessionId;
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: セッショントークンなし");
             return false;
         }
 
@@ -1839,7 +1824,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IntPtr windowHandle = default,
         OcrHints? cachedOcrHints = null)
     {
-        if (_fallbackOrchestrator == null || _licenseManager == null)
+        if (_fallbackOrchestrator == null)
             return null;
 
         try
@@ -1854,7 +1839,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 targetLanguage, translationSettings.DefaultTargetLanguage);
 
             // セッショントークンを取得
-            var sessionToken = _licenseManager.CurrentState.SessionId ?? string.Empty;
+            var sessionToken = _licenseManager?.CurrentState.SessionId ?? string.Empty;
 
             // [Issue #427] 翻訳履歴を取得
             IReadOnlyList<TranslationHistoryEntry>? history = null;

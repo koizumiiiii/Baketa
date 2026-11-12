@@ -309,7 +309,8 @@ public sealed class ApplicationModule : ServiceModuleBase
                     provider.GetService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>(), // ONNXモデル オンデマンドロード/アンロード
                     provider.GetService<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache>(), // [Issue #525] Detection-Onlyキャッシュ
                     provider.GetService<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>(), // [Issue #525] 画像変化検知キャッシュ
-                    logger);
+                    logger,
+                    provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService>());
             }
             catch (Exception ex)
             {

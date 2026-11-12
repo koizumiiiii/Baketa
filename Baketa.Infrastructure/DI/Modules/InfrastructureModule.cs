@@ -360,7 +360,7 @@ public class InfrastructureModule : ServiceModuleBase
         // 🆕 Issue #273: Cloud翻訳可用性統合サービス
         // ライセンス状態とユーザー設定を統合して一貫した可用性判定を提供
         services.AddSingleton<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService,
-            Baketa.Infrastructure.Translation.Services.DisabledCloudTranslationAvailabilityService>();
+            Baketa.Infrastructure.Translation.Services.GeminiTranslationAvailabilityService>();
         Console.WriteLine("✅ [Issue #273] CloudTranslationAvailabilityService登録完了 - ライセンス×設定統合");
     }
 
@@ -961,9 +961,15 @@ public class InfrastructureModule : ServiceModuleBase
             Console.WriteLine("⚠️ CloudTranslationSettings登録完了 - デフォルト値使用");
         }
 
-        // Phase 1 keeps the abstraction while both cloud providers are unavailable.
+        // BYOK remains registered so credentials can be changed without restarting.
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.IGeminiSettingsService>(_ => new Translation.Cloud.GeminiSettingsService());
+        services.AddHttpClient(Translation.Cloud.GeminiImageTranslator.ClientName, client => client.Timeout = TimeSpan.FromSeconds(45))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+            .RedactLoggedHeaders(new[] { "x-goog-api-key" });
+        services.AddSingleton<Translation.Cloud.GeminiImageTranslator>();
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.IGeminiConnectionService>(p => p.GetRequiredService<Translation.Cloud.GeminiImageTranslator>());
         services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>(
-            "primary", new Translation.Cloud.DisabledCloudImageTranslator("primary"));
+            "primary", (p, _) => p.GetRequiredService<Translation.Cloud.GeminiImageTranslator>());
         services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>(
             "secondary", new Translation.Cloud.DisabledCloudImageTranslator("secondary"));
 

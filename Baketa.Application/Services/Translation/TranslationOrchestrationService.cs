@@ -83,6 +83,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     // Issue #290: Fork-Join並列実行用（OCR || Cloud AI翻訳）
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
+    private readonly Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService? _cloudAvailability;
     private readonly ILicenseManager? _licenseManager;
 
     // Issue #293: 投機的OCRサービス（Shot翻訳応答時間短縮）
@@ -201,7 +202,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         IUnifiedSettingsService? unifiedSettingsService = null, // ONNXモデル オンデマンドロード/アンロード
         IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #525] Detection-Onlyキャッシュ
         Baketa.Core.Abstractions.Services.IImageChangeDetectionService? imageChangeDetectionService = null, // [Issue #525] 画像変化検知キャッシュ
-        ILogger<TranslationOrchestrationService>? logger = null)
+        ILogger<TranslationOrchestrationService>? logger = null,
+        Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudAvailability = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
@@ -218,6 +220,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationService = translationService;
         _translationDictionaryService = translationDictionaryService;
         _fallbackOrchestrator = fallbackOrchestrator;
+        _cloudAvailability = cloudAvailability;
         _licenseManager = licenseManager;
         _speculativeOcrService = speculativeOcrService;
         _windowManagerAdapter = windowManagerAdapter;
@@ -2948,7 +2951,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <summary>
     /// Cloud AI並列実行が利用可能かどうかを判定
     /// </summary>
-    /// <returns>Pro/Premiaプランでセッションが有効な場合はtrue</returns>
+    /// <returns>True when BYOK translation is configured and preferred.</returns>
     private bool IsCloudAiParallelExecutionAvailable()
     {
         // FallbackOrchestratorが登録されていない場合は並列実行不可
@@ -2958,36 +2961,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             return false;
         }
 
-        // LicenseManagerが登録されていない場合は並列実行不可
-        if (_licenseManager == null)
-        {
-            _logger?.LogInformation("[Issue #290] LicenseManager未登録 - 並列実行無効");
-            return false;
-        }
+        if (_cloudAvailability?.IsEffectivelyEnabled != true) return false;
 
-        // Cloud AI翻訳機能が利用可能かチェック
-        if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
-        {
-            _logger?.LogInformation("[Issue #290] CloudAiTranslation機能が無効 - 並列実行無効");
-            return false;
-        }
-
-        // セッションが有効かチェック
-        var sessionId = _licenseManager.CurrentState.SessionId;
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            _logger?.LogInformation("[Issue #290] セッションID未設定 - 並列実行無効");
-            return false;
-        }
-
-        // FallbackOrchestratorの状態をチェック
-        var fallbackStatus = _fallbackOrchestrator.GetCurrentStatus();
-        if (!fallbackStatus.PrimaryAvailable && !fallbackStatus.SecondaryAvailable)
-        {
-            _logger?.LogInformation("[Issue #290] Cloud AI翻訳サービス利用不可 - 並列実行無効");
-            return false;
-        }
-
+        // The fallback orchestrator rechecks cooldown expiry when invoked.
+        // A cached status here would prevent retries after both providers become unavailable.
         _logger?.LogInformation("[Issue #290] Cloud AI並列実行が利用可能");
         return true;
     }
@@ -3039,14 +3016,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     .ConfigureAwait(false);
                 var targetLanguage = translationSettings?.DefaultTargetLanguage ?? "ja";
 
-                // セッショントークンを取得
-                var sessionToken = _licenseManager!.CurrentState.SessionId;
-                if (string.IsNullOrEmpty(sessionToken))
-                {
-                    _logger?.LogWarning("[Issue #290] セッショントークンが空 - Cloud翻訳スキップ");
-                    return null;
-                }
-
                 // ImageTranslationRequestを作成
                 var request = new ImageTranslationRequest
                 {
@@ -3056,7 +3025,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     TargetLanguage = targetLanguage,
                     Width = image.Width,
                     Height = image.Height,
-                    SessionToken = sessionToken
+                    SessionToken = string.Empty
                 };
 
                 // タイムアウト付きでCloud翻訳を実行

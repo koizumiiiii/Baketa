@@ -73,6 +73,38 @@
                            IsVisible="{Binding !IsLanguagePairValid}"/>
             </StackPanel>
 
+            <StackPanel DataContext="{Binding Gemini}" x:DataType="vm:GeminiSettingsViewModel" Spacing="10">
+                <TextBlock Text="{local:Localize Gemini_Title}" FontSize="16" FontWeight="Medium"/>
+                <TextBlock Text="{local:Localize Gemini_Description}" TextWrapping="Wrap"/>
+                <Button Content="{local:Localize Gemini_GetKey}" Command="{Binding OpenStudioCommand}"/>
+                <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsBusy}">
+                    <TextBox Grid.Column="0" Text="{Binding ApiKey, Mode=TwoWay}" PasswordChar="●" Watermark="{local:Localize Gemini_Key}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="1" Content="{local:Localize Gemini_SaveKey}" Command="{Binding SaveKeyCommand}"/>
+                </Grid>
+                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="3"/>
+                <TextBlock Text="{Binding Status}" TextWrapping="Wrap"
+                           Classes.error="{Binding IsStatusError}" Classes.success="{Binding IsStatusSuccess}">
+                    <TextBlock.Styles>
+                        <Style Selector="TextBlock.error">
+                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                        </Style>
+                        <Style Selector="TextBlock.success">
+                            <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                        </Style>
+                    </TextBlock.Styles>
+                </TextBlock>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="{local:Localize Gemini_Method}" VerticalAlignment="Center"/>
+                    <RadioButton Content="{local:Localize Gemini_MethodGemini}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding PreferGemini, Mode=OneWay}" Command="{Binding SelectGeminiCommand}"/>
+                    <RadioButton Content="{local:Localize Gemini_MethodLocal}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding !PreferGemini, Mode=OneWay}" Command="{Binding SelectLocalCommand}"/>
+                </StackPanel>
+                <Button Content="{local:Localize Gemini_DeleteKey}" Command="{Binding DeleteKeyCommand}"/>
+                <TextBlock Text="{local:Localize Gemini_Privacy}" TextWrapping="Wrap"/>
+                <TextBlock Text="{local:Localize Gemini_Billing}" TextWrapping="Wrap"/>
+            </StackPanel>
+
             <!-- 外観設定 -->
             <StackPanel Spacing="12">
                 <TextBlock Text="{local:Localize Settings_General_Appearance}" FontSize="16" FontWeight="Medium"/>

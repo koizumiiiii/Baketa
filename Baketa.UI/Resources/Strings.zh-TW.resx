@@ -1822,4 +1822,59 @@
     <value>OK</value>
   </data>
 
+  <data name="Gemini_Title" xml:space="preserve">
+    <value>Gemini 翻譯（建議）</value>
+  </data>
+  <data name="Gemini_Description" xml:space="preserve"><value>高品質翻譯需要免費的 Gemini API 金鑰。</value></data>
+  <data name="Gemini_Key" xml:space="preserve">
+    <value>② Gemini API 金鑰</value>
+  </data>
+  <data name="Gemini_SaveKey" xml:space="preserve"><value>儲存</value></data>
+  <data name="Gemini_DeleteKey" xml:space="preserve">
+    <value>刪除金鑰</value>
+  </data>
+  <data name="Gemini_GetKey" xml:space="preserve"><value>① 取得 API 金鑰 ↗</value></data>
+  <data name="Gemini_Privacy" xml:space="preserve">
+    <value>使用免費額度時，提交的圖片可能會用於改善 Google 服務。</value>
+  </data>
+  <data name="Gemini_Billing" xml:space="preserve">
+    <value>API 費用和速率限制取決於您的 Google 帳戶。</value>
+  </data>
+  <data name="Gemini_KeySaved" xml:space="preserve"><value>金鑰已儲存（已隱藏）。</value></data>
+  <data name="Gemini_NoKey" xml:space="preserve">
+    <value>未儲存金鑰：將使用本機翻譯。</value>
+  </data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 已確認連線。將使用 Gemini 翻譯。</value></data>
+  <data name="Gemini_TestFailed" xml:space="preserve"><value>無法確認連線。金鑰尚未儲存，請重試。</value></data>
+  <data name="Gemini_SettingsFailed" xml:space="preserve">
+    <value>設定操作失敗。請檢查輸入內容以及儲存位置的存取權限。</value>
+  </data>
+  <data name="Gemini_RateLimited" xml:space="preserve">
+    <value>已達到 Gemini 速率限制。等待期間將使用本機翻譯。</value>
+  </data>
+  <data name="Gemini_InvalidKey" xml:space="preserve">
+    <value>無法使用 Gemini API 金鑰。將使用本機翻譯。請在設定中檢查金鑰和 API 權限，然後重新儲存。</value>
+  </data>
+  <data name="Gemini_Failed" xml:space="preserve">
+    <value>Gemini 翻譯失敗。正在切換至本機翻譯。請檢查網路和 API 設定。</value>
+  </data>
+  <data name="Gemini_Processing" xml:space="preserve">
+    <value>處理中…</value>
+  </data>
+  <data name="Gemini_TestInvalidKey" xml:space="preserve">
+    <value>API 金鑰無效或存取遭拒。</value>
+  </data>
+  <data name="Gemini_TestRateLimited" xml:space="preserve">
+    <value>已達到請求頻率限制。請稍後再試。</value>
+  </data>
+  <data name="Gemini_TestNetworkError" xml:space="preserve">
+    <value>無法連線。請檢查網路連線。</value>
+  </data>
+  <data name="Gemini_TestTimeout" xml:space="preserve">
+    <value>連線測試逾時。請重試。</value>
+  </data>
+  <data name="Gemini_Checking" xml:space="preserve"><value>確認中…</value></data>
+  <data name="Gemini_Method" xml:space="preserve"><value>翻譯方式：</value></data>
+  <data name="Gemini_MethodLocal" xml:space="preserve"><value>本機</value></data>
+  <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
 </root>

@@ -1822,4 +1822,39 @@ Action: Please restart the app.</value>
     <value>OK</value>
   </data>
 
+  <data name="Gemini_Title" xml:space="preserve"><value>Gemini translation (recommended)</value></data>
+  <data name="Gemini_Description" xml:space="preserve"><value>High-quality translation requires a free Gemini API key.</value></data>
+  <data name="Gemini_Key" xml:space="preserve"><value>② Gemini API key</value></data>
+  <data name="Gemini_SaveKey" xml:space="preserve"><value>Save</value></data>
+  <data name="Gemini_DeleteKey" xml:space="preserve"><value>Delete key</value></data>
+  <data name="Gemini_GetKey" xml:space="preserve"><value>① Get an API key ↗</value></data>
+  <data name="Gemini_Privacy" xml:space="preserve"><value>On the free tier, submitted images may be used to improve Google services.</value></data>
+  <data name="Gemini_Billing" xml:space="preserve"><value>API charges and rate limits depend on your Google account.</value></data>
+  <data name="Gemini_KeySaved" xml:space="preserve"><value>Key saved (hidden).</value></data>
+  <data name="Gemini_NoKey" xml:space="preserve"><value>No key saved: local translation is used.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Connection verified. Gemini will translate.</value></data>
+  <data name="Gemini_TestFailed" xml:space="preserve"><value>Connection failed. The key was not saved. Please try again.</value></data>
+  <data name="Gemini_SettingsFailed" xml:space="preserve"><value>Settings operation failed. Check your input and access to the storage location.</value></data>
+  <data name="Gemini_RateLimited" xml:space="preserve"><value>Gemini rate limit reached. Local translation is used during cooldown.</value></data>
+  <data name="Gemini_InvalidKey" xml:space="preserve"><value>Gemini API key could not be used. Using local translation. Check the key and API permissions in settings and save again.</value></data>
+  <data name="Gemini_Failed" xml:space="preserve"><value>Gemini translation failed. Switching to local translation. Check your network and API settings.</value></data>
+  <data name="Gemini_Processing" xml:space="preserve">
+    <value>Processing…</value>
+  </data>
+  <data name="Gemini_TestInvalidKey" xml:space="preserve">
+    <value>The API key is invalid or access is denied.</value>
+  </data>
+  <data name="Gemini_TestRateLimited" xml:space="preserve">
+    <value>Rate limit reached. Please try again later.</value>
+  </data>
+  <data name="Gemini_TestNetworkError" xml:space="preserve">
+    <value>Could not connect. Check your network connection.</value>
+  </data>
+  <data name="Gemini_TestTimeout" xml:space="preserve">
+    <value>The connection test timed out. Please try again.</value>
+  </data>
+  <data name="Gemini_Checking" xml:space="preserve"><value>Checking…</value></data>
+  <data name="Gemini_Method" xml:space="preserve"><value>Translation method:</value></data>
+  <data name="Gemini_MethodLocal" xml:space="preserve"><value>Local</value></data>
+  <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
 </root>
