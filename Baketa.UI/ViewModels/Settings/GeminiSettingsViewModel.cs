@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Reactive;
 using System.Reactive.Disposables;
@@ -18,6 +18,8 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
 {
     private readonly IGeminiSettingsService _settings;
     private readonly IGeminiConnectionService _connection;
+    private readonly ITranslationMethodService? _methods;
+    private readonly Action<string> _openUrl;
     // Fody weaving is disabled in this project; explicitly use ReactiveUI notifications.
     private string _apiKey = "";
     [Reactive]
@@ -74,9 +76,11 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SelectLocalCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenStudioCommand { get; }
 
-    public GeminiSettingsViewModel(IGeminiSettingsService settings, IGeminiConnectionService connection, IEventAggregator events) : base(events)
+    public GeminiSettingsViewModel(IGeminiSettingsService settings, IGeminiConnectionService connection, IEventAggregator events, ITranslationMethodService? methods = null, Action<string>? openUrl = null) : base(events)
     {
         _settings = settings;
+        _methods = methods;
+        _openUrl = openUrl ?? (url => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }));
         _connection = connection;
         HasApiKey = settings.HasApiKey;
         PreferGemini = HasApiKey && settings.PreferGemini;
@@ -105,8 +109,17 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
                     return;
                 }
                 await _settings.SaveApiKeyAsync(key);
-                HasApiKey = true;
-                PreferGemini = true;
+                HasApiKey = _settings.HasApiKey;
+                try
+                {
+                    if (_methods != null) await _methods.SelectAsync(TranslationMethod.Gemini);
+                }
+                catch (Exception)
+                {
+                    SetStatus("BYOK_KeySavedMethodFailed", error: true);
+                    return;
+                }
+                PreferGemini = HasApiKey && (_methods?.Current == TranslationMethod.Gemini || (_methods == null && _settings.PreferGemini));
                 SetStatus("Gemini_TestSuccess", success: true);
             }
             finally { ApiKey = ""; }
@@ -115,7 +128,8 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
         {
             await _settings.DeleteApiKeyAsync();
             ApiKey = "";
-            HasApiKey = false;
+            HasApiKey = _settings.HasApiKey;
+            if (_methods != null) await _methods.SelectIfCurrentAsync(TranslationMethod.Gemini, TranslationMethod.Local);
             PreferGemini = false;
             SetStatus("Gemini_NoKey");
         }), this.WhenAnyValue(x => x.IsBusy, x => x.HasApiKey, (busy, hasKey) => !busy && hasKey))
@@ -124,12 +138,15 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
             this.WhenAnyValue(x => x.IsBusy, x => x.HasApiKey, (busy, hasKey) => !busy && hasKey))
             .DisposeWith(Disposables);
         SelectLocalCommand = ReactiveCommand.CreateFromTask(() => SelectMethodAsync(false), ready).DisposeWith(Disposables);
-        OpenStudioCommand = ReactiveCommand.CreateFromTask(() => RunAsync(() =>
+        OpenStudioCommand = ReactiveCommand.Create(() =>
         {
-            Process.Start(new ProcessStartInfo("https://aistudio.google.com/apikey") { UseShellExecute = true });
-            SetStatus(HasApiKey ? "Gemini_KeySaved" : "Gemini_NoKey");
-            return Task.CompletedTask;
-        }), ready).DisposeWith(Disposables);
+            // Navigation must not release a state-changing operation's busy flag.
+            try { _openUrl("https://aistudio.google.com/apikey"); }
+            catch (Exception)
+            {
+                if (!IsBusy) SetStatus("Gemini_SettingsFailed", error: true);
+            }
+        }).DisposeWith(Disposables);
         Disposable.Create(() => ApiKey = "").DisposeWith(Disposables);
         this.WhenActivated(disposables => Disposable.Create(() => ApiKey = "").DisposeWith(disposables));
     }
@@ -137,7 +154,8 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
     private Task SelectMethodAsync(bool preferGemini) => RunAsync(async () =>
     {
         if (preferGemini && !HasApiKey) return;
-        await _settings.SetOptionsAsync(_settings.Model, preferGemini);
+        if (_methods != null) await _methods.SelectAsync(preferGemini ? TranslationMethod.Gemini : TranslationMethod.Local);
+        else await _settings.SetOptionsAsync(_settings.Model, preferGemini);
         PreferGemini = preferGemini;
         SetStatus(HasApiKey ? "Gemini_KeySaved" : "Gemini_NoKey");
     });
@@ -150,12 +168,15 @@ public sealed class GeminiSettingsViewModel : ViewModelBase
     }
     private async Task RunAsync(Func<Task> action)
     {
+        if (IsBusy) return;
         IsBusy = true;
         SetStatus("Gemini_Processing");
         try { await action(); }
         catch (Exception) { SetStatus("Gemini_SettingsFailed", error: true); }
         finally
         {
+            HasApiKey = _settings.HasApiKey;
+            PreferGemini = HasApiKey && (_methods != null ? _methods.Current == TranslationMethod.Gemini : _settings.PreferGemini);
             IsBusy = false;
             // Reapply the persisted selection if a radio button operation failed.
             this.RaisePropertyChanged(nameof(PreferGemini));

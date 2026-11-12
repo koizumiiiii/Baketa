@@ -110,12 +110,17 @@ public sealed class GeminiSettingsServiceTests : IDisposable
         Assert.NotNull(register);
         register.Invoke(null, [services]);
         services.Replace(ServiceDescriptor.Singleton<IGeminiSettingsService>(settings));
+        using var google = new GoogleTranslationSettingsService(_root);
+        using var methods = new TranslationMethodService(settings, google, _root);
+        services.Replace(ServiceDescriptor.Singleton<IGoogleTranslationSettingsService>(google));
+        services.Replace(ServiceDescriptor.Singleton<ITranslationMethodService>(methods));
         await using var provider = services.BuildServiceProvider();
         var translator = provider.GetRequiredKeyedService<ICloudImageTranslator>("primary");
         Assert.IsType<GeminiImageTranslator>(translator);
         Assert.Equal(keyPresent, await translator.IsAvailableAsync());
         Assert.IsType<DisabledCloudImageTranslator>(provider.GetRequiredKeyedService<ICloudImageTranslator>("secondary"));
         await settings.SaveApiKeyAsync("test-only-credential");
+        await methods.SelectAsync(Baketa.Core.Models.TranslationMethod.Gemini);
         Assert.True(await translator.IsAvailableAsync());
         await settings.DeleteApiKeyAsync();
         Assert.False(await translator.IsAvailableAsync());

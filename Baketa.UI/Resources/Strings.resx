@@ -1831,8 +1831,8 @@ Action: Please restart the app.</value>
   <data name="Gemini_Privacy" xml:space="preserve"><value>On the free tier, submitted images may be used to improve Google services.</value></data>
   <data name="Gemini_Billing" xml:space="preserve"><value>API charges and rate limits depend on your Google account.</value></data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>Key saved (hidden).</value></data>
-  <data name="Gemini_NoKey" xml:space="preserve"><value>No key saved: local translation is used.</value></data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Connection verified. Gemini will translate.</value></data>
+  <data name="Gemini_NoKey" xml:space="preserve"><value>No key saved.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Key saved (connection verified).</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>Connection failed. The key was not saved. Please try again.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve"><value>Settings operation failed. Check your input and access to the storage location.</value></data>
   <data name="Gemini_RateLimited" xml:space="preserve"><value>Gemini rate limit reached. Local translation is used during cooldown.</value></data>
@@ -1857,4 +1857,36 @@ Action: Please restart the app.</value>
   <data name="Gemini_Method" xml:space="preserve"><value>Translation method:</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>Local</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ Key saved (connection verified).</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>Checking…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>Google Translate rate limit reached. Local translation is used during cooldown.</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>Rate limit reached. Please try again later.</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>Save</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>Processing…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>Requires a Google Cloud API key and billing account (free allowance available). Set a daily quota in Google Cloud to limit unexpected charges.</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① Get an API key ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>Connection failed. The key was not saved. Please try again.</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>Google Translate API key could not be used. Using local translation. Check the key and API permissions in settings and save again.</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>Delete key</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>The connection test timed out. Please try again.</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Google Translate API key</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>Key saved (hidden).</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>Settings operation failed. Check your input and access to the storage location.</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>Requires a Google Cloud API key and billing account (free allowance available). Set a daily quota in Google Cloud to limit unexpected charges.</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>No key saved.</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Google Translate translation failed. Switching to local translation. Check your network and API settings.</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>Could not connect. Check your network connection.</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>The API key is invalid or access is denied.</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>Translation text is sent to Google.</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Google Translate</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>Enable Cloud Translation API ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>Pricing ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>Set daily quota ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>Enable Cloud Translation API in Google Cloud Console.</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>Set up a billing account in Google Cloud.</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>Access denied. Check the API key restrictions and permissions.</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>Google Translate is unavailable. Using local translation for now.</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>The API key was saved, but the translation method could not be saved. Select the method again.</value>
+  </data>
 </root>

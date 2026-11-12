@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Threading;
@@ -95,6 +95,106 @@ public class TranslationOrchestrationServiceTests : IDisposable
             null, // detectionBoundsCache（Issue #525: テスト用にnull）
             null, // imageChangeDetectionService（Issue #525: テスト用にnull）
             _loggerMock.Object);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MethodChanged_UnchangedScreen_RetranslatesAfterInFlightCompletes(bool changeWhileInFlight)
+    {
+        var methods = new Mock<TranslationAbstractions.ITranslationMethodService>();
+        var current = Baketa.Core.Models.TranslationMethod.Local;
+        methods.SetupGet(x => x.Current).Returns(() => current);
+        var geminiSettings = Mock.Of<TranslationAbstractions.IGeminiSettingsService>(x => x.HasApiKey == true);
+        using var availability = new Baketa.Infrastructure.Translation.Services.GeminiTranslationAvailabilityService(geminiSettings, methods: methods.Object);
+        var cloud = new Mock<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
+        cloud.Setup(x => x.TranslateWithFallbackAsync(It.IsAny<Baketa.Core.Translation.Abstractions.ImageTranslationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Baketa.Core.Translation.Abstractions.FallbackTranslationResult());
+        var textDetection = new Mock<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
+        var bounds = new Mock<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache>();
+        var imageDetection = new Mock<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>();
+        var cache = new Mock<TranslationAbstractions.ICloudTranslationCache>();
+        var calls = new List<string>();
+        var local = new Mock<TranslationAbstractions.ITranslationEngine>();
+        local.SetupGet(x => x.Name).Returns("NLLB");
+        local.Setup(x => x.TranslateBatchAsync(It.IsAny<IReadOnlyList<Baketa.Core.Translation.Models.TranslationRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Baketa.Core.Translation.Models.TranslationRequest> batch, CancellationToken _) =>
+                batch.Select(r => Baketa.Core.Translation.Models.TranslationResponse.CreateSuccess(r, "Local translation", "NLLB", 0)).ToArray());
+        using var handler = new GoogleResponseHandler();
+        var httpFactory = new Mock<System.Net.Http.IHttpClientFactory>();
+        httpFactory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(() => new System.Net.Http.HttpClient(handler, false));
+        var googleSettings = new Mock<TranslationAbstractions.IGoogleTranslationSettingsService>();
+        googleSettings.SetupGet(x => x.HasApiKey).Returns(true);
+        googleSettings.Setup(x => x.GetApiKey()).Returns("test-only-key");
+        using var google = new Baketa.Infrastructure.Translation.Cloud.GoogleTranslationEngine(httpFactory.Object, googleSettings.Object,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Baketa.Infrastructure.Translation.Cloud.GoogleTranslationEngine>.Instance);
+        using var router = new Baketa.Infrastructure.Translation.Cloud.SelectedTextTranslationEngine(local.Object, google, methods.Object);
+        _translationServiceMock.Setup(x => x.TranslateAsync(It.IsAny<string>(), It.IsAny<Baketa.Core.Models.Translation.Language>(),
+                It.IsAny<Baketa.Core.Models.Translation.Language>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string text, Baketa.Core.Models.Translation.Language source, Baketa.Core.Models.Translation.Language target, string? _, CancellationToken token) =>
+            {
+                var response = await router.TranslateAsync(new Baketa.Core.Translation.Models.TranslationRequest
+                { SourceText = text, SourceLanguage = source, TargetLanguage = target }, token);
+                calls.Add(response.EngineName);
+                return response;
+            });
+        _captureServiceMock.Setup(x => x.DetectChangesAsync(It.IsAny<IImage>(), It.IsAny<IImage>(), It.IsAny<float>())).ReturnsAsync(false);
+        _settingsServiceMock.Setup(x => x.GetAsync<CoreTranslationSettings>()).ReturnsAsync(new CoreTranslationSettings
+        { DefaultSourceLanguage = "en", DefaultTargetLanguage = "ja" });
+        var options = Mock.Of<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>(x => x.CurrentValue == new Baketa.Core.Settings.OcrSettings());
+        using var service = new TranslationOrchestrationService(_captureServiceMock.Object, _settingsServiceMock.Object,
+            _ocrEngineMock.Object, null, _eventAggregatorMock.Object, options, _translationServiceMock.Object,
+            fallbackOrchestrator: cloud.Object, textChangeDetectionService: textDetection.Object,
+            cloudTranslationCache: cache.Object, detectionBoundsCache: bounds.Object, imageChangeDetectionService: imageDetection.Object,
+            cloudAvailability: availability, translationMethods: methods.Object);
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var step = typeof(TranslationOrchestrationService).GetMethod("ExecuteAutomaticTranslationStepAsync", flags)!;
+        var inFlight = typeof(TranslationOrchestrationService).GetField("_translationInFlightTask", flags)!;
+        async Task<string> Step()
+        {
+            var task = (Task)step.Invoke(service, [CancellationToken.None])!;
+            await task;
+            return task.GetType().GetProperty("Result")!.GetValue(task)!.ToString()!;
+        }
+        async Task Complete() => await ((Task)inFlight.GetValue(service)!).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("TranslationDispatched", await Step());
+        await Complete();
+        Assert.Contains("NLLB", calls);
+        Assert.Equal("NoChange", await Step());
+        foreach (var next in new[] { Baketa.Core.Models.TranslationMethod.Google, Baketa.Core.Models.TranslationMethod.Gemini, Baketa.Core.Models.TranslationMethod.Local })
+        {
+            var pending = new TaskCompletionSource();
+            if (changeWhileInFlight) inFlight.SetValue(service, pending.Task);
+            current = next;
+            methods.Raise(x => x.Changed += null, EventArgs.Empty);
+            if (changeWhileInFlight)
+            {
+                Assert.Equal("TranslationInFlight", await Step());
+                pending.SetResult();
+            }
+            calls.Clear();
+            Assert.Equal("TranslationDispatched", await Step());
+            await Complete();
+            Assert.Contains(next == Baketa.Core.Models.TranslationMethod.Google ? google.Name : "NLLB", calls);
+            Assert.Equal("NoChange", await Step());
+        }
+        cloud.Verify(x => x.TranslateWithFallbackAsync(It.IsAny<Baketa.Core.Translation.Abstractions.ImageTranslationRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        textDetection.Verify(x => x.ClearAllPreviousTexts(), Times.Exactly(3));
+        textDetection.Verify(x => x.ClearStaticUiMarkers(), Times.Exactly(3));
+        bounds.Verify(x => x.ClearAll(), Times.Exactly(3));
+        imageDetection.Verify(x => x.ClearCache(null), Times.Exactly(3));
+        cache.Verify(x => x.ClearAll(), Times.Exactly(3));
+        service.Dispose();
+        methods.VerifyRemove(x => x.Changed -= It.IsAny<EventHandler>(), Times.Once);
+    }
+
+    private sealed class GoogleResponseHandler : System.Net.Http.HttpMessageHandler
+    {
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new System.Net.Http.StringContent("""{"data":{"translations":[{"translatedText":"Google translation"}]}}""")
+            });
     }
 
     #region 自動翻訳制御テスト
@@ -776,3 +876,4 @@ public class TranslationOrchestrationServiceCacheClearTests : IDisposable
         _disposed = true;
     }
 }
+

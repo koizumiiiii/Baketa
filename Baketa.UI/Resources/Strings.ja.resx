@@ -1831,8 +1831,8 @@
   <data name="Gemini_Privacy" xml:space="preserve"><value>無料枠では送信した画像がGoogleのサービス改善に利用される場合があります</value></data>
   <data name="Gemini_Billing" xml:space="preserve"><value>API利用料・レート制限はユーザーのGoogleアカウントに依存します</value></data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>キー保存済み（非表示）。</value></data>
-  <data name="Gemini_NoKey" xml:space="preserve"><value>キー未設定：ローカル翻訳を使用します。</value></data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 接続を確認しました。Geminiで翻訳します。</value></data>
+  <data name="Gemini_NoKey" xml:space="preserve"><value>キー未設定。</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ キー保存済み（接続を確認しました）。</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>接続を確認できませんでした。キーは保存されていません。再度お試しください。</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve"><value>設定操作に失敗しました。入力内容と保存先へのアクセスを確認してください。</value></data>
   <data name="Gemini_RateLimited" xml:space="preserve"><value>Geminiのレート制限に達しました。待機中はローカル翻訳を使用します。</value></data>
@@ -1857,4 +1857,36 @@
   <data name="Gemini_Method" xml:space="preserve"><value>翻訳方法:</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>ローカル</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ キー保存済み（接続を確認しました）。</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>確認中…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>Google翻訳のレート制限に達しました。待機中はローカル翻訳を使用します。</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>レート制限に達しました。しばらく待ってから再試行してください。</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>保存</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>処理中…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>Google Cloud のAPIキーと課金アカウントの登録が必要です（無料枠あり）。予期しない課金を防ぐため、Google Cloudで1日の上限（クォータ）設定を推奨します。</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① APIキーを取得 ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>接続を確認できませんでした。キーは保存されていません。再度お試しください。</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>Google翻訳 APIキーを利用できません。ローカル翻訳を使用します。設定でキーとAPI権限を確認し、保存し直してください。</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>キーを削除</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>接続テストがタイムアウトしました。再試行してください。</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Google翻訳 APIキー</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>キー保存済み（非表示）。</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>設定操作に失敗しました。入力内容と保存先へのアクセスを確認してください。</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>Google Cloud のAPIキーと課金アカウントの登録が必要です（無料枠あり）。予期しない課金を防ぐため、Google Cloudで1日の上限（クォータ）設定を推奨します。</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>キー未設定。</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Google翻訳翻訳に失敗しました。ローカル翻訳に切り替えます。ネットワークとAPI設定を確認してください。</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>接続できませんでした。ネットワーク接続を確認してください。</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>APIキーが無効、またはアクセスが拒否されました。</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>翻訳テキストは Google に送信されます。</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Google翻訳</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>Cloud Translation API を有効化 ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>料金 ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>1日の上限を設定 ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>Google Cloud コンソールで Cloud Translation API を有効にしてください</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>Google Cloud で課金アカウントの設定が必要です</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>アクセスが拒否されました。キーのAPI制限や権限を確認してください。</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>Google翻訳が利用できないため、今回はローカル翻訳を使用します。</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>APIキーは保存済みですが、翻訳方式を保存できませんでした。翻訳方式を選び直してください。</value>
+  </data>
 </root>

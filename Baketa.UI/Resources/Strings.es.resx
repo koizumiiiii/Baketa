@@ -1842,9 +1842,9 @@ Acción: Reinicie la aplicación.</value>
   </data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>Clave guardada (oculta).</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
-    <value>No hay ninguna clave guardada: se utiliza la traducción local.</value>
+    <value>No hay ninguna clave guardada.</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Conexión verificada. Se usará Gemini para traducir.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Clave guardada (conexión verificada).</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>Error de conexión. No se ha guardado la clave. Inténtalo de nuevo.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>No se pudo completar la operación de configuración. Comprueba los datos introducidos y el acceso a la ubicación de almacenamiento.</value>
@@ -1877,4 +1877,36 @@ Acción: Reinicie la aplicación.</value>
   <data name="Gemini_Method" xml:space="preserve"><value>Método de traducción:</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>Local</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ Clave guardada (conexión verificada).</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>Verificando…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>Se ha alcanzado el límite de solicitudes de Traductor de Google. Se utiliza la traducción local durante el tiempo de espera.</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>Se ha alcanzado el límite de solicitudes. Inténtalo más tarde.</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>Guardar</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>Procesando…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>Se requiere una clave API de Google Cloud y una cuenta de facturación (hay una cuota gratuita). Configure una cuota diaria para limitar cargos inesperados.</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① Obtener una clave API ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>Error de conexión. No se ha guardado la clave. Inténtalo de nuevo.</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>No se pudo utilizar la clave de API de Traductor de Google. Se utiliza la traducción local. Comprueba la clave y los permisos de la API en la configuración y vuelve a guardar la clave.</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>Eliminar clave</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>Se agotó el tiempo de la prueba de conexión. Inténtalo de nuevo.</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Clave de API de Traductor de Google</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>Clave guardada (oculta).</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>No se pudo completar la operación de configuración. Comprueba los datos introducidos y el acceso a la ubicación de almacenamiento.</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>Se requiere una clave API de Google Cloud y una cuenta de facturación (hay una cuota gratuita). Configure una cuota diaria para limitar cargos inesperados.</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>No hay ninguna clave guardada.</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Error en la traducción con Traductor de Google. Se cambiará a la traducción local. Comprueba la configuración de red y de la API.</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>No se pudo conectar. Comprueba tu conexión de red.</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>La clave API no es válida o se ha denegado el acceso.</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>El texto para traducir se envía a Google.</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Traductor de Google</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>Habilitar Cloud Translation API ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>Precios ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>Configurar cuota diaria ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>Habilite Cloud Translation API en la consola de Google Cloud.</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>Configure una cuenta de facturación en Google Cloud.</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>Acceso denegado. Revise las restricciones y los permisos de la clave API.</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>El Traductor de Google no está disponible. Se usará la traducción local.</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>La clave API se guardó, pero no se pudo guardar el método de traducción. Seleccione el método de nuevo.</value>
+  </data>
 </root>

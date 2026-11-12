@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Translation.Cloud;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -310,8 +311,12 @@ public sealed class BackgroundWarmupService(
         {
             ReportProgress(0.7, "Initializing translation engine", WarmupPhase.TranslationInitialization);
 
-            // ITranslationEngineサービスを取得（全ての実装をウォームアップ）
-            var translationEngines = _serviceProvider.GetServices<ITranslationEngine>().ToList();
+            // Warm local models directly; never send dummy translations through the router.
+            var translationEngines = _serviceProvider.GetServices<ITranslationEngine>()
+                .Select(engine => engine is SelectedTextTranslationEngine selected ? selected.LocalEngine : engine)
+                .Where(engine => !engine.RequiresNetwork)
+                .Distinct()
+                .ToList();
             if (!translationEngines.Any())
             {
                 _logger.LogWarning("ITranslationEngineサービスが見つかりません");

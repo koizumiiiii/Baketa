@@ -73,6 +73,19 @@
                            IsVisible="{Binding !IsLanguagePairValid}"/>
             </StackPanel>
 
+            <StackPanel DataContext="{Binding TranslationMethod}" x:DataType="vm:TranslationMethodViewModel" Spacing="10">
+                <TextBlock Text="{local:Localize Gemini_Method}" FontSize="16" FontWeight="Medium"/>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <RadioButton Content="{local:Localize Gemini_MethodGemini}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding IsGemini, Mode=OneWay}" Command="{Binding SelectGeminiCommand}"/>
+                    <RadioButton Content="{local:Localize Google_Title}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding IsGoogle, Mode=OneWay}" Command="{Binding SelectGoogleCommand}"/>
+                    <RadioButton Content="{local:Localize Gemini_MethodLocal}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding IsLocal, Mode=OneWay}" Command="{Binding SelectLocalCommand}"/>
+                </StackPanel>
+                <TextBlock Text="{Binding Status}" TextWrapping="Wrap"/>
+            </StackPanel>
+
             <StackPanel DataContext="{Binding Gemini}" x:DataType="vm:GeminiSettingsViewModel" Spacing="10">
                 <TextBlock Text="{local:Localize Gemini_Title}" FontSize="16" FontWeight="Medium"/>
                 <TextBlock Text="{local:Localize Gemini_Description}" TextWrapping="Wrap"/>
@@ -93,16 +106,37 @@
                         </Style>
                     </TextBlock.Styles>
                 </TextBlock>
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                    <TextBlock Text="{local:Localize Gemini_Method}" VerticalAlignment="Center"/>
-                    <RadioButton Content="{local:Localize Gemini_MethodGemini}" GroupName="TranslationMethod"
-                                 IsChecked="{Binding PreferGemini, Mode=OneWay}" Command="{Binding SelectGeminiCommand}"/>
-                    <RadioButton Content="{local:Localize Gemini_MethodLocal}" GroupName="TranslationMethod"
-                                 IsChecked="{Binding !PreferGemini, Mode=OneWay}" Command="{Binding SelectLocalCommand}"/>
-                </StackPanel>
+
                 <Button Content="{local:Localize Gemini_DeleteKey}" Command="{Binding DeleteKeyCommand}"/>
                 <TextBlock Text="{local:Localize Gemini_Privacy}" TextWrapping="Wrap"/>
                 <TextBlock Text="{local:Localize Gemini_Billing}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <StackPanel DataContext="{Binding Google}" x:DataType="vm:GoogleTranslationSettingsViewModel" Spacing="10">
+                <TextBlock Text="{local:Localize Google_Title}" FontSize="16" FontWeight="Medium"/>
+                <TextBlock Text="{local:Localize Google_Description}" TextWrapping="Wrap"/>
+                <Button Content="{local:Localize Google_GetKey}" Command="{Binding OpenStudioCommand}"/>
+                <Button Content="{local:Localize Google_EnableApi}" Command="{Binding OpenApiCommand}"/>
+                <Button Content="{local:Localize Google_Pricing}" Command="{Binding OpenPricingCommand}"/>
+                <Button Content="{local:Localize Google_Quota}" Command="{Binding OpenQuotaCommand}"/>
+                <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsBusy}">
+                    <TextBox Grid.Column="0" Text="{Binding ApiKey, Mode=TwoWay}" PasswordChar="●" Watermark="{local:Localize Google_Key}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="1" Content="{local:Localize Google_SaveKey}" Command="{Binding SaveKeyCommand}"/>
+                </Grid>
+                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="3"/>
+                <TextBlock Text="{Binding Status}" TextWrapping="Wrap"
+                           Classes.error="{Binding IsStatusError}" Classes.success="{Binding IsStatusSuccess}">
+                    <TextBlock.Styles>
+                        <Style Selector="TextBlock.error">
+                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                        </Style>
+                        <Style Selector="TextBlock.success">
+                            <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                        </Style>
+                    </TextBlock.Styles>
+                </TextBlock>
+
+                <Button Content="{local:Localize Google_DeleteKey}" Command="{Binding DeleteKeyCommand}"/>
+                <TextBlock Text="{local:Localize Google_Privacy}" TextWrapping="Wrap"/>
             </StackPanel>
 
             <!-- 外観設定 -->

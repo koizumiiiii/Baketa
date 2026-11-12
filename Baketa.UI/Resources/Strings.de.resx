@@ -1842,9 +1842,9 @@ Maßnahme: Bitte starten Sie die App neu.</value>
   </data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>Schlüssel gespeichert (ausgeblendet).</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
-    <value>Kein Schlüssel gespeichert: Die lokale Übersetzung wird verwendet.</value>
+    <value>Kein Schlüssel gespeichert.</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Verbindung bestätigt. Gemini wird für Übersetzungen verwendet.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Schlüssel gespeichert (Verbindung bestätigt).</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>Verbindung fehlgeschlagen. Der Schlüssel wurde nicht gespeichert. Bitte erneut versuchen.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>Einstellungen konnten nicht verarbeitet werden. Prüfen Sie Ihre Eingaben und den Zugriff auf den Speicherort.</value>
@@ -1877,4 +1877,36 @@ Maßnahme: Bitte starten Sie die App neu.</value>
   <data name="Gemini_Method" xml:space="preserve"><value>Übersetzungsmethode:</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>Lokal</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ Schlüssel gespeichert (Verbindung bestätigt).</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>Wird geprüft…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>Google Übersetzer-Anfragelimit erreicht. Während der Wartezeit wird die lokale Übersetzung verwendet.</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>Anfragelimit erreicht. Bitte versuchen Sie es später erneut.</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>Speichern</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>Wird verarbeitet…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>Ein Google Cloud API-Schlüssel und ein Abrechnungskonto sind erforderlich (kostenloses Kontingent verfügbar). Legen Sie ein Tageskontingent fest, um unerwartete Kosten zu begrenzen.</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① API-Schlüssel abrufen ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>Verbindung fehlgeschlagen. Der Schlüssel wurde nicht gespeichert. Bitte erneut versuchen.</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>Der Google Übersetzer-API-Schlüssel konnte nicht verwendet werden. Die lokale Übersetzung wird verwendet. Prüfen Sie den Schlüssel und die API-Berechtigungen in den Einstellungen und speichern Sie ihn erneut.</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>Schlüssel löschen</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>Zeitüberschreitung beim Verbindungstest. Bitte versuchen Sie es erneut.</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Google Übersetzer-API-Schlüssel</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>Schlüssel gespeichert (ausgeblendet).</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>Einstellungen konnten nicht verarbeitet werden. Prüfen Sie Ihre Eingaben und den Zugriff auf den Speicherort.</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>Ein Google Cloud API-Schlüssel und ein Abrechnungskonto sind erforderlich (kostenloses Kontingent verfügbar). Legen Sie ein Tageskontingent fest, um unerwartete Kosten zu begrenzen.</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>Kein Schlüssel gespeichert.</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Google Übersetzer-Übersetzung fehlgeschlagen. Es wird zur lokalen Übersetzung gewechselt. Prüfen Sie Ihre Netzwerk- und API-Einstellungen.</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>Verbindung fehlgeschlagen. Prüfen Sie Ihre Netzwerkverbindung.</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>Der API-Schlüssel ist ungültig oder der Zugriff wurde verweigert.</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>Übersetzungstexte werden an Google gesendet.</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Google Übersetzer</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>Cloud Translation API aktivieren ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>Preise ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>Tageskontingent festlegen ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>Aktivieren Sie die Cloud Translation API in der Google Cloud Console.</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>Richten Sie ein Abrechnungskonto in Google Cloud ein.</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>Zugriff verweigert. Prüfen Sie die API-Schlüsselbeschränkungen und Berechtigungen.</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>Google Übersetzer ist nicht verfügbar. Die lokale Übersetzung wird verwendet.</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>Der API-Schlüssel wurde gespeichert, aber die Übersetzungsmethode konnte nicht gespeichert werden. Wählen Sie die Methode erneut.</value>
+  </data>
 </root>

@@ -18,7 +18,8 @@ public sealed class GeminiImageTranslator(
     IGeminiSettingsService settings,
     IGeminiNotificationService? notifications = null,
     TimeProvider? timeProvider = null,
-    ILogger<GeminiImageTranslator>? logger = null) : ICloudImageTranslator, IGeminiConnectionService
+    ILogger<GeminiImageTranslator>? logger = null,
+    ITranslationMethodService? methods = null) : ICloudImageTranslator, IGeminiConnectionService
 {
     public const string ClientName = "GeminiByok";
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -67,7 +68,7 @@ public sealed class GeminiImageTranslator(
         try
         {
             Refresh();
-            return settings.HasApiKey && settings.PreferGemini && !_invalidKey && _time.GetUtcNow() >= _cooldown;
+            return settings.HasApiKey && (methods != null ? methods.Current == TranslationMethod.Gemini : settings.PreferGemini) && !_invalidKey && _time.GetUtcNow() >= _cooldown;
         }
         finally { _gate.Release(); }
     }
@@ -136,7 +137,7 @@ public sealed class GeminiImageTranslator(
         {
             Refresh();
             var key = settings.GetApiKey();
-            if (string.IsNullOrEmpty(key) || !settings.PreferGemini || _invalidKey || started < _cooldown)
+            if (string.IsNullOrEmpty(key) || !(methods != null ? methods.Current == TranslationMethod.Gemini : settings.PreferGemini) || _invalidKey || started < _cooldown)
                 return Failure(request, "GEMINI_UNAVAILABLE", started);
             var model = _resolvedModel ?? settings.Model;
             var discovered = false;

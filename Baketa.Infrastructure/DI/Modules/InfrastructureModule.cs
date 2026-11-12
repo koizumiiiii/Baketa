@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -443,7 +443,7 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddHostedService<Baketa.Infrastructure.Translation.Services.ServerManagerHostedService>();
 
         // [Issue #445] ONNX Runtime 直接推論モード（Python/gRPC 翻訳サーバー不要）
-        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
+        services.AddSingleton<Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine>(provider =>
         {
             var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
             var onnxLogger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine>>();
@@ -455,6 +455,11 @@ public class InfrastructureModule : ServiceModuleBase
             return new Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine(modelDir, onnxLogger);
         });
 
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(p =>
+            new Translation.Cloud.SelectedTextTranslationEngine(
+                p.GetRequiredService<Translation.Onnx.OnnxTranslationEngine>(),
+                p.GetRequiredService<Translation.Cloud.GoogleTranslationEngine>(),
+                p.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationMethodService>()));
         Console.WriteLine("🚀 [Issue #445] OnnxTranslationEngine 登録完了（Python/gRPC翻訳廃止）");
         Console.WriteLine($"🚀 [Issue #445] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
     }
@@ -966,6 +971,13 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddHttpClient(Translation.Cloud.GeminiImageTranslator.ClientName, client => client.Timeout = TimeSpan.FromSeconds(45))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
             .RedactLoggedHeaders(new[] { "x-goog-api-key" });
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.IGoogleTranslationSettingsService>(_ => new Translation.Cloud.GoogleTranslationSettingsService());
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationMethodService, Translation.Cloud.TranslationMethodService>();
+        services.AddHttpClient(Translation.Cloud.GoogleTranslationEngine.ClientName, client => client.Timeout = Translation.Cloud.GoogleTranslationEngine.DefaultOperationTimeout)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+            .RedactLoggedHeaders(new[] { "x-goog-api-key" });
+        services.AddSingleton<Translation.Cloud.GoogleTranslationEngine>();
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.IGoogleTranslationConnectionService>(p => p.GetRequiredService<Translation.Cloud.GoogleTranslationEngine>());
         services.AddSingleton<Translation.Cloud.GeminiImageTranslator>();
         services.AddSingleton<Baketa.Core.Abstractions.Translation.IGeminiConnectionService>(p => p.GetRequiredService<Translation.Cloud.GeminiImageTranslator>());
         services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>(

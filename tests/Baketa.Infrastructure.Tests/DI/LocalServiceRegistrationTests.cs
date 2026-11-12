@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Models;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Analytics;
@@ -16,6 +17,7 @@ using Baketa.Infrastructure.Translation.Cloud;
 using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using Xunit;
@@ -54,7 +56,14 @@ public class LocalServiceRegistrationTests
         byok.SetupGet(x => x.PreferGemini).Returns(true);
         byok.SetupGet(x => x.Model).Returns("gemini-flash-lite-latest");
         byok.Setup(x => x.SetOptionsAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        services.AddSingleton(byok.Object);
+        services.Replace(ServiceDescriptor.Singleton(byok.Object));
+        var google = new Mock<IGoogleTranslationSettingsService>(MockBehavior.Strict);
+        services.Replace(ServiceDescriptor.Singleton(google.Object));
+        var methods = new Mock<ITranslationMethodService>(MockBehavior.Strict);
+        methods.SetupGet(x => x.Current).Returns(hasKey ? TranslationMethod.Gemini : TranslationMethod.Local);
+        methods.Setup(x => x.SelectAsync(TranslationMethod.Gemini, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        services.Replace(ServiceDescriptor.Singleton(methods.Object));
         var http = new Mock<IHttpClientFactory>(MockBehavior.Strict);
         services.AddSingleton(http.Object);
         await using var provider = services.BuildServiceProvider();
@@ -71,6 +80,10 @@ public class LocalServiceRegistrationTests
         await consent.SyncLocalConsentToServerAsync("legacy-user", "legacy-session");
 
         // Assert: both overloads expose the same network-free boundaries.
+        Assert.Same(byok.Object, Assert.Single(provider.GetServices<IGeminiSettingsService>()));
+        Assert.Same(google.Object, Assert.Single(provider.GetServices<IGoogleTranslationSettingsService>()));
+        Assert.Same(methods.Object, Assert.Single(provider.GetServices<ITranslationMethodService>()));
+        methods.Verify(x => x.SelectAsync(TranslationMethod.Gemini, It.IsAny<CancellationToken>()), Times.Once);
         Assert.IsType<GeminiImageTranslator>(primary);
         Assert.IsType<DisabledCloudImageTranslator>(secondary);
         Assert.Equal(hasKey, await primary.IsAvailableAsync());
