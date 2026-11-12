@@ -76,20 +76,33 @@
             <StackPanel DataContext="{Binding Gemini}" x:DataType="vm:GeminiSettingsViewModel" Spacing="10">
                 <TextBlock Text="{local:Localize Gemini_Title}" FontSize="16" FontWeight="Medium"/>
                 <TextBlock Text="{local:Localize Gemini_Description}" TextWrapping="Wrap"/>
-                <TextBox Text="{Binding ApiKey, Mode=TwoWay}" PasswordChar="●" Watermark="{local:Localize Gemini_Key}"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="{local:Localize Gemini_SaveKey}" Command="{Binding SaveKeyCommand}"/>
-                    <Button Content="{local:Localize Gemini_DeleteKey}" Command="{Binding DeleteKeyCommand}"/>
-                    <Button Content="{local:Localize Gemini_Test}" Command="{Binding TestCommand}"/>
-                </StackPanel>
-                <TextBlock Text="{local:Localize Gemini_Model}"/>
-                <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding Model, Mode=TwoWay}"/>
-                <CheckBox Content="{local:Localize Gemini_Preferred}" IsChecked="{Binding PreferGemini, Mode=TwoWay}"/>
-                <Button Content="{local:Localize Gemini_SaveOptions}" Command="{Binding SaveOptionsCommand}"/>
                 <Button Content="{local:Localize Gemini_GetKey}" Command="{Binding OpenStudioCommand}"/>
+                <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsBusy}">
+                    <TextBox Grid.Column="0" Text="{Binding ApiKey, Mode=TwoWay}" PasswordChar="●" Watermark="{local:Localize Gemini_Key}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="1" Content="{local:Localize Gemini_SaveKey}" Command="{Binding SaveKeyCommand}"/>
+                </Grid>
+                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="3"/>
+                <TextBlock Text="{Binding Status}" TextWrapping="Wrap"
+                           Classes.error="{Binding IsStatusError}" Classes.success="{Binding IsStatusSuccess}">
+                    <TextBlock.Styles>
+                        <Style Selector="TextBlock.error">
+                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                        </Style>
+                        <Style Selector="TextBlock.success">
+                            <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                        </Style>
+                    </TextBlock.Styles>
+                </TextBlock>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="{local:Localize Gemini_Method}" VerticalAlignment="Center"/>
+                    <RadioButton Content="{local:Localize Gemini_MethodGemini}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding PreferGemini, Mode=OneWay}" Command="{Binding SelectGeminiCommand}"/>
+                    <RadioButton Content="{local:Localize Gemini_MethodLocal}" GroupName="TranslationMethod"
+                                 IsChecked="{Binding !PreferGemini, Mode=OneWay}" Command="{Binding SelectLocalCommand}"/>
+                </StackPanel>
+                <Button Content="{local:Localize Gemini_DeleteKey}" Command="{Binding DeleteKeyCommand}"/>
                 <TextBlock Text="{local:Localize Gemini_Privacy}" TextWrapping="Wrap"/>
                 <TextBlock Text="{local:Localize Gemini_Billing}" TextWrapping="Wrap"/>
-                <TextBlock Text="{Binding Status}" TextWrapping="Wrap"/>
             </StackPanel>
 
             <!-- 外観設定 -->

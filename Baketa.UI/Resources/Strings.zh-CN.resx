@@ -1825,54 +1825,27 @@
   <data name="Gemini_Title" xml:space="preserve">
     <value>Gemini 翻译（推荐）</value>
   </data>
-  <data name="Gemini_Description" xml:space="preserve">
-    <value>保存您自己的 Gemini API 密钥即可启用图像翻译。未设置密钥或发生错误时，将使用本地翻译。</value>
-  </data>
+  <data name="Gemini_Description" xml:space="preserve"><value>高质量翻译需要免费的 Gemini API 密钥。</value></data>
   <data name="Gemini_Key" xml:space="preserve">
-    <value>Gemini API 密钥</value>
+    <value>② Gemini API 密钥</value>
   </data>
-  <data name="Gemini_SaveKey" xml:space="preserve">
-    <value>保存密钥</value>
-  </data>
+  <data name="Gemini_SaveKey" xml:space="preserve"><value>保存</value></data>
   <data name="Gemini_DeleteKey" xml:space="preserve">
     <value>删除密钥</value>
   </data>
-  <data name="Gemini_Test" xml:space="preserve">
-    <value>测试已保存的密钥</value>
-  </data>
-  <data name="Gemini_Model" xml:space="preserve">
-    <value>模型</value>
-  </data>
-  <data name="Gemini_Preferred" xml:space="preserve">
-    <value>使用 Gemini（关闭后使用本地翻译）</value>
-  </data>
-  <data name="Gemini_SaveOptions" xml:space="preserve">
-    <value>保存模型和翻译方式</value>
-  </data>
-  <data name="Gemini_GetKey" xml:space="preserve">
-    <value>在 Google AI Studio 中获取 API 密钥</value>
-  </data>
+  <data name="Gemini_GetKey" xml:space="preserve"><value>① 获取 API 密钥 ↗</value></data>
   <data name="Gemini_Privacy" xml:space="preserve">
     <value>使用免费配额时，提交的图像可能会用于改进 Google 服务。</value>
   </data>
   <data name="Gemini_Billing" xml:space="preserve">
     <value>API 费用和速率限制取决于您的 Google 账号。</value>
   </data>
-  <data name="Gemini_KeySaved" xml:space="preserve">
-    <value>密钥已保存（已隐藏）。Gemini 已启用。</value>
-  </data>
+  <data name="Gemini_KeySaved" xml:space="preserve"><value>密钥已保存（已隐藏）。</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
     <value>未保存密钥：将使用本地翻译。</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve">
-    <value>连接测试成功。</value>
-  </data>
-  <data name="Gemini_TestFailed" xml:space="preserve">
-    <value>连接失败。请检查已保存的密钥、网络和 API 限制。</value>
-  </data>
-  <data name="Gemini_OptionsSaved" xml:space="preserve">
-    <value>模型和翻译方式已保存。</value>
-  </data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 连接已验证。将使用 Gemini 翻译。</value></data>
+  <data name="Gemini_TestFailed" xml:space="preserve"><value>连接验证失败。密钥未保存，请重试。</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>设置操作失败。请检查输入内容以及对存储位置的访问权限。</value>
   </data>
@@ -1885,4 +1858,23 @@
   <data name="Gemini_Failed" xml:space="preserve">
     <value>Gemini 翻译失败。正在切换到本地翻译。请检查网络和 API 设置。</value>
   </data>
+  <data name="Gemini_Processing" xml:space="preserve">
+    <value>正在处理…</value>
+  </data>
+  <data name="Gemini_TestInvalidKey" xml:space="preserve">
+    <value>API 密钥无效或访问被拒绝。</value>
+  </data>
+  <data name="Gemini_TestRateLimited" xml:space="preserve">
+    <value>已达到请求频率限制。请稍后重试。</value>
+  </data>
+  <data name="Gemini_TestNetworkError" xml:space="preserve">
+    <value>无法连接。请检查网络连接。</value>
+  </data>
+  <data name="Gemini_TestTimeout" xml:space="preserve">
+    <value>连接测试超时。请重试。</value>
+  </data>
+  <data name="Gemini_Checking" xml:space="preserve"><value>正在验证…</value></data>
+  <data name="Gemini_Method" xml:space="preserve"><value>翻译方式：</value></data>
+  <data name="Gemini_MethodLocal" xml:space="preserve"><value>本地</value></data>
+  <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
 </root>

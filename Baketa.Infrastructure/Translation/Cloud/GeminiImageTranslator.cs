@@ -81,28 +81,48 @@ public sealed class GeminiImageTranslator(
         return await client.SendAsync(message, ct).ConfigureAwait(false);
     }
 
-    public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
+    private void LogResult(string operation, GeminiConnectionResult result, int? httpStatusCode) =>
+        (logger ?? NullLogger<GeminiImageTranslator>.Instance).LogInformation(
+            "Gemini {Operation}: {ResultKind}, HTTP {HttpStatusCode}", operation, result, httpStatusCode);
+
+    private static GeminiConnectionResult Classify(HttpStatusCode status, string body) => status switch
+    {
+        HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => GeminiConnectionResult.InvalidKey,
+        HttpStatusCode.BadRequest when body.Contains("API_KEY_INVALID", StringComparison.Ordinal) => GeminiConnectionResult.InvalidKey,
+        HttpStatusCode.TooManyRequests => GeminiConnectionResult.RateLimited,
+        _ => GeminiConnectionResult.Failed
+    };
+
+    public async Task<GeminiConnectionResult> TestConnectionAsync(string? apiKey = null, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var result = GeminiConnectionResult.Failed;
+        int? status = null;
         try
         {
             Refresh();
-            var key = settings.GetApiKey();
-            if (string.IsNullOrEmpty(key)) return false;
-            try
-            {
-                using var response = await SendAsync(HttpMethod.Get, "models", key, null, cancellationToken).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode) return false;
-                using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-                var success = json.RootElement.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array;
-                if (success && string.Equals(key, settings.GetApiKey(), StringComparison.Ordinal))
-                    ResetAuthenticationError();
-                return success;
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return false; }
-            catch (Exception ex) when (ex is HttpRequestException or JsonException) { return false; }
+            var key = string.IsNullOrWhiteSpace(apiKey) ? settings.GetApiKey() : apiKey.Trim();
+            if (string.IsNullOrWhiteSpace(key)) return result = GeminiConnectionResult.NoKey;
+            using var response = await SendAsync(HttpMethod.Get, "models", key, null, cancellationToken).ConfigureAwait(false);
+            status = (int)response.StatusCode;
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return result = Classify(response.StatusCode, body);
+            using var json = JsonDocument.Parse(body);
+            var success = json.RootElement.ValueKind == JsonValueKind.Object &&
+                json.RootElement.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array;
+            if (success && string.Equals(key, settings.GetApiKey(), StringComparison.Ordinal))
+                ResetAuthenticationError();
+            return result = success ? GeminiConnectionResult.Success : GeminiConnectionResult.Failed;
         }
-        finally { _gate.Release(); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { return result = GeminiConnectionResult.Timeout; }
+        catch (HttpRequestException) { return result = GeminiConnectionResult.NetworkError; }
+        catch (JsonException) { return result = GeminiConnectionResult.Failed; }
+        finally
+        {
+            LogResult("ConnectionTest", result, status);
+            _gate.Release();
+        }
     }
 
     public async Task<ImageTranslationResponse> TranslateImageAsync(ImageTranslationRequest request, CancellationToken cancellationToken = default)
@@ -111,6 +131,7 @@ public sealed class GeminiImageTranslator(
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         var started = _time.GetUtcNow();
         string? notification = null;
+        int? httpStatus = null;
         try
         {
             Refresh();
@@ -124,7 +145,9 @@ public sealed class GeminiImageTranslator(
                 var thinking = !_withoutThinking.Contains(model);
                 using var response = await SendAsync(HttpMethod.Post, "models/" + Uri.EscapeDataString(model) + ":generateContent",
                     key, CreateBody(request, model, thinking), cancellationToken).ConfigureAwait(false);
+                httpStatus = (int)response.StatusCode;
                 var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) LogResult("Translation", Classify(response.StatusCode, body), httpStatus);
                 if (response.StatusCode == HttpStatusCode.NotFound && !discovered)
                 {
                     discovered = true;
@@ -165,11 +188,13 @@ public sealed class GeminiImageTranslator(
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            LogResult("Translation", GeminiConnectionResult.Timeout, httpStatus);
             notification = "Gemini_Failed";
             return Failure(request, TranslationErrorDetail.Codes.Timeout, started);
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException or IndexOutOfRangeException)
         {
+            LogResult("Translation", ex is HttpRequestException ? GeminiConnectionResult.NetworkError : GeminiConnectionResult.Failed, httpStatus);
             // Do not log exception details: HTTP bodies can echo credentials or screen text.
             notification = "Gemini_Failed";
             return Failure(request, TranslationErrorDetail.Codes.ApiError, started);
@@ -224,6 +249,7 @@ public sealed class GeminiImageTranslator(
         {
             using var response = await SendAsync(HttpMethod.Get, "models" + (page == null ? "" : "?pageToken=" + Uri.EscapeDataString(page)), key, null, ct).ConfigureAwait(false);
             var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) LogResult("ModelDiscovery", Classify(response.StatusCode, body), (int)response.StatusCode);
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 SetRateLimitCooldown(response, body);

@@ -1825,54 +1825,27 @@ Maßnahme: Bitte starten Sie die App neu.</value>
   <data name="Gemini_Title" xml:space="preserve">
     <value>Gemini-Übersetzung (empfohlen)</value>
   </data>
-  <data name="Gemini_Description" xml:space="preserve">
-    <value>Speichern Sie Ihren eigenen Gemini-API-Schlüssel, um die Bildübersetzung zu aktivieren. Ohne Schlüssel oder bei einem Fehler wird die lokale Übersetzung verwendet.</value>
-  </data>
+  <data name="Gemini_Description" xml:space="preserve"><value>Für hochwertige Übersetzungen benötigen Sie einen kostenlosen Gemini-API-Schlüssel.</value></data>
   <data name="Gemini_Key" xml:space="preserve">
-    <value>Gemini-API-Schlüssel</value>
+    <value>② Gemini-API-Schlüssel</value>
   </data>
-  <data name="Gemini_SaveKey" xml:space="preserve">
-    <value>Schlüssel speichern</value>
-  </data>
+  <data name="Gemini_SaveKey" xml:space="preserve"><value>Speichern</value></data>
   <data name="Gemini_DeleteKey" xml:space="preserve">
     <value>Schlüssel löschen</value>
   </data>
-  <data name="Gemini_Test" xml:space="preserve">
-    <value>Gespeicherten Schlüssel testen</value>
-  </data>
-  <data name="Gemini_Model" xml:space="preserve">
-    <value>Modell</value>
-  </data>
-  <data name="Gemini_Preferred" xml:space="preserve">
-    <value>Gemini verwenden (deaktivieren für lokale Übersetzung)</value>
-  </data>
-  <data name="Gemini_SaveOptions" xml:space="preserve">
-    <value>Modell und Übersetzungsmethode speichern</value>
-  </data>
-  <data name="Gemini_GetKey" xml:space="preserve">
-    <value>API-Schlüssel in Google AI Studio erhalten</value>
-  </data>
+  <data name="Gemini_GetKey" xml:space="preserve"><value>① API-Schlüssel abrufen ↗</value></data>
   <data name="Gemini_Privacy" xml:space="preserve">
     <value>Im kostenlosen Tarif können übermittelte Bilder zur Verbesserung der Google-Dienste verwendet werden.</value>
   </data>
   <data name="Gemini_Billing" xml:space="preserve">
     <value>API-Gebühren und Anfragelimits hängen von Ihrem Google-Konto ab.</value>
   </data>
-  <data name="Gemini_KeySaved" xml:space="preserve">
-    <value>Schlüssel gespeichert (ausgeblendet). Gemini ist aktiviert.</value>
-  </data>
+  <data name="Gemini_KeySaved" xml:space="preserve"><value>Schlüssel gespeichert (ausgeblendet).</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
     <value>Kein Schlüssel gespeichert: Die lokale Übersetzung wird verwendet.</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve">
-    <value>Verbindungstest erfolgreich.</value>
-  </data>
-  <data name="Gemini_TestFailed" xml:space="preserve">
-    <value>Verbindung fehlgeschlagen. Prüfen Sie den gespeicherten Schlüssel, das Netzwerk und die API-Limits.</value>
-  </data>
-  <data name="Gemini_OptionsSaved" xml:space="preserve">
-    <value>Modell und Übersetzungsmethode gespeichert.</value>
-  </data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Verbindung bestätigt. Gemini wird für Übersetzungen verwendet.</value></data>
+  <data name="Gemini_TestFailed" xml:space="preserve"><value>Verbindung fehlgeschlagen. Der Schlüssel wurde nicht gespeichert. Bitte erneut versuchen.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>Einstellungen konnten nicht verarbeitet werden. Prüfen Sie Ihre Eingaben und den Zugriff auf den Speicherort.</value>
   </data>
@@ -1885,4 +1858,23 @@ Maßnahme: Bitte starten Sie die App neu.</value>
   <data name="Gemini_Failed" xml:space="preserve">
     <value>Gemini-Übersetzung fehlgeschlagen. Es wird zur lokalen Übersetzung gewechselt. Prüfen Sie Ihre Netzwerk- und API-Einstellungen.</value>
   </data>
+  <data name="Gemini_Processing" xml:space="preserve">
+    <value>Wird verarbeitet…</value>
+  </data>
+  <data name="Gemini_TestInvalidKey" xml:space="preserve">
+    <value>Der API-Schlüssel ist ungültig oder der Zugriff wurde verweigert.</value>
+  </data>
+  <data name="Gemini_TestRateLimited" xml:space="preserve">
+    <value>Anfragelimit erreicht. Bitte versuchen Sie es später erneut.</value>
+  </data>
+  <data name="Gemini_TestNetworkError" xml:space="preserve">
+    <value>Verbindung fehlgeschlagen. Prüfen Sie Ihre Netzwerkverbindung.</value>
+  </data>
+  <data name="Gemini_TestTimeout" xml:space="preserve">
+    <value>Zeitüberschreitung beim Verbindungstest. Bitte versuchen Sie es erneut.</value>
+  </data>
+  <data name="Gemini_Checking" xml:space="preserve"><value>Wird geprüft…</value></data>
+  <data name="Gemini_Method" xml:space="preserve"><value>Übersetzungsmethode:</value></data>
+  <data name="Gemini_MethodLocal" xml:space="preserve"><value>Lokal</value></data>
+  <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
 </root>

@@ -1,3 +1,5 @@
+using Baketa.Core.Models;
+
 namespace Baketa.Core.Abstractions.Translation;
 
 /// <summary>BYOK credentials are stored separately from exportable application settings.</summary>
@@ -18,7 +20,7 @@ public interface IGeminiSettingsService
 
 public interface IGeminiConnectionService
 {
-    Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default);
+    Task<GeminiConnectionResult> TestConnectionAsync(string? apiKey = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Only a resource identifier crosses the infrastructure/UI boundary.</summary>

@@ -11,7 +11,7 @@ public sealed class GeminiSettingsService : IGeminiSettingsService, IDisposable
 {
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private State _state = new(null, "gemini-flash-lite-latest", true);
+    private State _state = new(null, "gemini-flash-lite-latest", false);
     private long _revision;
     private long _apiKeySaveRevision;
     private sealed record State(string? ApiKey, string Model, bool PreferGemini);
@@ -51,12 +51,12 @@ public sealed class GeminiSettingsService : IGeminiSettingsService, IDisposable
         Interlocked.Increment(ref _apiKeySaveRevision);
     }
     public Task DeleteApiKeyAsync(CancellationToken cancellationToken = default) =>
-        UpdateAsync(s => s with { ApiKey = null }, cancellationToken);
+        UpdateAsync(s => s with { ApiKey = null, PreferGemini = false }, cancellationToken);
     public Task SetOptionsAsync(string model, bool preferGemini, CancellationToken cancellationToken = default)
     {
         if (model is not ("gemini-flash-lite-latest" or "gemini-flash-latest"))
             throw new ArgumentException("Unsupported model.", nameof(model));
-        return UpdateAsync(s => s with { Model = model, PreferGemini = preferGemini }, cancellationToken);
+        return UpdateAsync(s => s with { Model = model, PreferGemini = preferGemini && !string.IsNullOrWhiteSpace(s.ApiKey) }, cancellationToken);
     }
     private async Task UpdateAsync(Func<State, State> update, CancellationToken cancellationToken)
     {

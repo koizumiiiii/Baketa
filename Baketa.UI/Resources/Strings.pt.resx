@@ -1825,54 +1825,27 @@ Ação: Reinicie o aplicativo.</value>
   <data name="Gemini_Title" xml:space="preserve">
     <value>Tradução com Gemini (recomendada)</value>
   </data>
-  <data name="Gemini_Description" xml:space="preserve">
-    <value>Salve sua própria chave de API do Gemini para ativar a tradução de imagens. Sem uma chave ou em caso de falha, a tradução local é usada.</value>
-  </data>
+  <data name="Gemini_Description" xml:space="preserve"><value>Traduções de alta qualidade requerem uma chave de API gratuita do Gemini.</value></data>
   <data name="Gemini_Key" xml:space="preserve">
-    <value>Chave de API do Gemini</value>
+    <value>② Chave de API do Gemini</value>
   </data>
-  <data name="Gemini_SaveKey" xml:space="preserve">
-    <value>Salvar chave</value>
-  </data>
+  <data name="Gemini_SaveKey" xml:space="preserve"><value>Salvar</value></data>
   <data name="Gemini_DeleteKey" xml:space="preserve">
     <value>Excluir chave</value>
   </data>
-  <data name="Gemini_Test" xml:space="preserve">
-    <value>Testar chave salva</value>
-  </data>
-  <data name="Gemini_Model" xml:space="preserve">
-    <value>Modelo</value>
-  </data>
-  <data name="Gemini_Preferred" xml:space="preserve">
-    <value>Usar Gemini (desative para usar a tradução local)</value>
-  </data>
-  <data name="Gemini_SaveOptions" xml:space="preserve">
-    <value>Salvar modelo e método de tradução</value>
-  </data>
-  <data name="Gemini_GetKey" xml:space="preserve">
-    <value>Obter uma chave de API no Google AI Studio</value>
-  </data>
+  <data name="Gemini_GetKey" xml:space="preserve"><value>① Obter uma chave de API ↗</value></data>
   <data name="Gemini_Privacy" xml:space="preserve">
     <value>No nível gratuito, as imagens enviadas podem ser usadas para melhorar os serviços do Google.</value>
   </data>
   <data name="Gemini_Billing" xml:space="preserve">
     <value>As cobranças da API e os limites de solicitações dependem da sua conta do Google.</value>
   </data>
-  <data name="Gemini_KeySaved" xml:space="preserve">
-    <value>Chave salva (oculta). O Gemini está ativado.</value>
-  </data>
+  <data name="Gemini_KeySaved" xml:space="preserve"><value>Chave salva (oculta).</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
     <value>Nenhuma chave salva: a tradução local é usada.</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve">
-    <value>Teste de conexão realizado com sucesso.</value>
-  </data>
-  <data name="Gemini_TestFailed" xml:space="preserve">
-    <value>Falha na conexão. Verifique a chave salva, a rede e os limites da API.</value>
-  </data>
-  <data name="Gemini_OptionsSaved" xml:space="preserve">
-    <value>Modelo e método de tradução salvos.</value>
-  </data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Conexão verificada. O Gemini será usado para traduzir.</value></data>
+  <data name="Gemini_TestFailed" xml:space="preserve"><value>Falha na conexão. A chave não foi salva. Tente novamente.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>Falha na operação de configuração. Verifique os dados inseridos e o acesso ao local de armazenamento.</value>
   </data>
@@ -1885,4 +1858,23 @@ Ação: Reinicie o aplicativo.</value>
   <data name="Gemini_Failed" xml:space="preserve">
     <value>Falha na tradução com Gemini. Alternando para a tradução local. Verifique as configurações de rede e da API.</value>
   </data>
+  <data name="Gemini_Processing" xml:space="preserve">
+    <value>Processando…</value>
+  </data>
+  <data name="Gemini_TestInvalidKey" xml:space="preserve">
+    <value>A chave de API é inválida ou o acesso foi negado.</value>
+  </data>
+  <data name="Gemini_TestRateLimited" xml:space="preserve">
+    <value>Limite de solicitações atingido. Tente novamente mais tarde.</value>
+  </data>
+  <data name="Gemini_TestNetworkError" xml:space="preserve">
+    <value>Não foi possível conectar. Verifique sua conexão de rede.</value>
+  </data>
+  <data name="Gemini_TestTimeout" xml:space="preserve">
+    <value>O teste de conexão excedeu o tempo limite. Tente novamente.</value>
+  </data>
+  <data name="Gemini_Checking" xml:space="preserve"><value>Verificando…</value></data>
+  <data name="Gemini_Method" xml:space="preserve"><value>Método de tradução:</value></data>
+  <data name="Gemini_MethodLocal" xml:space="preserve"><value>Local</value></data>
+  <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
 </root>

@@ -1,3 +1,4 @@
+using Baketa.Core.Models;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -22,7 +23,7 @@ public sealed class GeminiImageTranslatorTests
     private static string SuccessBody => JsonSerializer.Serialize(new
     {
         candidates = new[] { new { finishReason = "STOP", content = new { parts = new[] { new { text = """
-            {"texts":[{"is_legible":true,"original":"Hello","translation":"こんにちは","bounding_box":[100,200,300,400],"confidence_score":0.95}],"detected_language":"en"}
+            {"texts":[{"is_legible":true,"original":"Hello","translation":"縺薙ｓ縺ｫ縺｡縺ｯ","bounding_box":[100,200,300,400],"confidence_score":0.95}],"detected_language":"en"}
             """ } } } } }
     });
 
@@ -147,7 +148,7 @@ public sealed class GeminiImageTranslatorTests
         var result = await translator.TranslateImageAsync(Request);
         Assert.True(result.IsSuccess);
         var text = Assert.Single(result.Texts!);
-        Assert.Equal("こんにちは", text.Translation);
+        Assert.Equal("縺薙ｓ縺ｫ縺｡縺ｯ", text.Translation);
         Assert.Equal(new Baketa.Core.Models.Int32Rect(200, 100, 200, 200), text.BoundingBox);
         Assert.Equal("en", result.DetectedLanguage);
     }
@@ -308,7 +309,7 @@ public sealed class GeminiImageTranslatorTests
             await settings.SetOptionsAsync(settings.Model, true);
             Assert.False(await translator.IsAvailableAsync());
             var revision = settings.Revision;
-            if (connectionTest) Assert.True(await translator.TestConnectionAsync());
+            if (connectionTest) Assert.Equal(GeminiConnectionResult.Success, await translator.TestConnectionAsync());
             else await settings.SaveApiKeyAsync(" " + FakeKey + " ");
             Assert.Equal(revision, settings.Revision);
             Assert.True(await translator.IsAvailableAsync());
@@ -345,7 +346,7 @@ public sealed class GeminiImageTranslatorTests
             await using var translator = Create(handler, settings, clock, notifications.Object);
             await translator.TranslateImageAsync(Request);
             await settings.SaveApiKeyAsync(FakeKey);
-            if (connectionTest) Assert.True(await translator.TestConnectionAsync());
+            if (connectionTest) Assert.Equal(GeminiConnectionResult.Success, await translator.TestConnectionAsync());
             Assert.False(await translator.IsAvailableAsync());
             await settings.SetOptionsAsync(settings.Model, false);
             Assert.False(await translator.IsAvailableAsync());
@@ -407,7 +408,7 @@ public sealed class GeminiImageTranslatorTests
             return Response(HttpStatusCode.OK, "{\"models\":[]}");
         });
         await using var translator = Create(handler);
-        Assert.True(await translator.TestConnectionAsync());
+        Assert.Equal(GeminiConnectionResult.Success, await translator.TestConnectionAsync());
     }
 
     [Fact]
@@ -459,5 +460,102 @@ public sealed class GeminiImageTranslatorTests
         settings.Setup(x => x.GetApiKey()).Returns((string?)null);
         Assert.False((await translator.TranslateImageAsync(Request)).IsSuccess);
         Assert.Equal(0, handler.Calls);
+    }
+    [Theory]
+    [InlineData(200, "{\"models\":[]}", GeminiConnectionResult.Success)]
+    [InlineData(200, "[]", GeminiConnectionResult.Failed)]
+    [InlineData(200, "invalid-json", GeminiConnectionResult.Failed)]
+    [InlineData(400, "API_KEY_INVALID", GeminiConnectionResult.InvalidKey)]
+    [InlineData(400, "other", GeminiConnectionResult.Failed)]
+    [InlineData(401, "", GeminiConnectionResult.InvalidKey)]
+    [InlineData(403, "", GeminiConnectionResult.InvalidKey)]
+    [InlineData(429, "", GeminiConnectionResult.RateLimited)]
+    [InlineData(500, "", GeminiConnectionResult.Failed)]
+    public async Task TestConnectionAsync_HttpResponse_ClassifiesAndLogsSafely(int status, string body, GeminiConnectionResult expected)
+    {
+        var settings = Settings();
+        settings.Setup(x => x.GetApiKey()).Returns("different-saved-key");
+        var logger = new Mock<ILogger<GeminiImageTranslator>>();
+        using var handler = new Handler(_ => Response((HttpStatusCode)status, status == 200 ? body : body + FakeKey));
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(() => new HttpClient(handler, false));
+        await using var translator = new GeminiImageTranslator(factory.Object, settings.Object, logger: logger.Object);
+        Assert.Equal(expected, await translator.TestConnectionAsync(FakeKey));
+        settings.Verify(x => x.SaveApiKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        AssertSafeLog(logger, expected, status);
+    }
+
+    private static void AssertSafeLog(Mock<ILogger<GeminiImageTranslator>> logger, GeminiConnectionResult expected, int? status)
+    {
+        var logs = logger.Invocations.Where(x => x.Method.Name == "Log").ToArray();
+        Assert.NotEmpty(logs);
+        Assert.All(logs, log =>
+        {
+            Assert.Null(log.Arguments[3]);
+            Assert.DoesNotContain(FakeKey, log.Arguments[2].ToString()!);
+            var fields = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(log.Arguments[2]).ToDictionary(x => x.Key, x => x.Value);
+            Assert.Equal(expected, fields["ResultKind"]);
+            Assert.Equal(status, fields["HttpStatusCode"]);
+            Assert.Equal(new[] { "Operation", "ResultKind", "HttpStatusCode", "{OriginalFormat}" }, fields.Keys);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Requests_TransportFailure_LogsOnlySafeMetadata(bool timeout, bool translate)
+    {
+        var logger = new Mock<ILogger<GeminiImageTranslator>>();
+        using var handler = new Handler(_ => timeout ? throw new TaskCanceledException(FakeKey) : throw new HttpRequestException(FakeKey));
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(() => new HttpClient(handler, false));
+        await using var translator = new GeminiImageTranslator(factory.Object, Settings().Object, logger: logger.Object);
+        var expected = timeout ? GeminiConnectionResult.Timeout : GeminiConnectionResult.NetworkError;
+        if (translate) Assert.False((await translator.TranslateImageAsync(Request)).IsSuccess);
+        else Assert.Equal(expected, await translator.TestConnectionAsync());
+        AssertSafeLog(logger, expected, null);
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_NoKey_DoesNotSendHttpRequest()
+    {
+        var settings = Settings();
+        settings.Setup(x => x.GetApiKey()).Returns((string?)null);
+        using var handler = new Handler(_ => throw new InvalidOperationException());
+        await using var translator = Create(handler, settings.Object);
+        Assert.Equal(GeminiConnectionResult.NoKey, await translator.TestConnectionAsync());
+        Assert.Equal(0, handler.Calls);
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_DifferentInputKey_DoesNotResetAuthenticationError()
+    {
+        var settings = Settings();
+        using var handler = new Handler(request => request.Method == HttpMethod.Get
+            ? Response(HttpStatusCode.OK, "{\"models\":[]}") : Response(HttpStatusCode.Forbidden, ""));
+        await using var translator = Create(handler, settings.Object);
+        Assert.False((await translator.TranslateImageAsync(Request)).IsSuccess);
+        settings.Setup(x => x.GetApiKey()).Returns("different-saved-key");
+        Assert.Equal(GeminiConnectionResult.Success, await translator.TestConnectionAsync(FakeKey));
+        Assert.False(await translator.IsAvailableAsync());
+    }
+
+    [Theory]
+    [InlineData(400, "API_KEY_INVALID", GeminiConnectionResult.InvalidKey)]
+    [InlineData(401, "", GeminiConnectionResult.InvalidKey)]
+    [InlineData(403, "", GeminiConnectionResult.InvalidKey)]
+    [InlineData(429, "", GeminiConnectionResult.RateLimited)]
+    [InlineData(500, "", GeminiConnectionResult.Failed)]
+    public async Task TranslateImageAsync_HttpFailure_LogsOnlySafeMetadata(int status, string body, GeminiConnectionResult expected)
+    {
+        var logger = new Mock<ILogger<GeminiImageTranslator>>();
+        using var handler = new Handler(_ => Response((HttpStatusCode)status, body + FakeKey));
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(() => new HttpClient(handler, false));
+        await using var translator = new GeminiImageTranslator(factory.Object, Settings().Object, logger: logger.Object);
+        Assert.False((await translator.TranslateImageAsync(Request)).IsSuccess);
+        AssertSafeLog(logger, expected, status);
     }
 }

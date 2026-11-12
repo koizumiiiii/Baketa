@@ -20,6 +20,15 @@ public sealed class GeminiSettingsServiceTests : IDisposable
     private readonly string _root = Path.Combine(AppContext.BaseDirectory, "byok-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public async Task SetOptionsAsync_WithoutKey_KeepsLocalPreference()
+    {
+        using var settings = new GeminiSettingsService(_root);
+        await settings.SetOptionsAsync(settings.Model, true);
+        Assert.False(settings.PreferGemini);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
     public async Task UpdateAsync_UnchangedSettings_DoesNotUpdateRevisionOrNotifyOrWrite()
     {
         using var settings = new GeminiSettingsService(_root);
@@ -68,6 +77,7 @@ public sealed class GeminiSettingsServiceTests : IDisposable
         Assert.False(availability.IsEntitled);
         using var deleted = new GeminiSettingsService(_root);
         Assert.Null(deleted.GetApiKey());
+        Assert.False(deleted.PreferGemini);
         Assert.Equal("gemini-flash-latest", deleted.Model);
         Assert.Equal(new[] { true, false, true, false }, events);
     }
