@@ -188,7 +188,7 @@ public sealed class WindowsCredentialStorage : ITokenStorage
             _logger.LogWarning("[TOKEN_CLEAR] Authentication tokens cleared from Windows Credential Manager (Access: {Access}, Refresh: {Refresh})",
                 accessDeleted, refreshDeleted);
 
-            return Task.FromResult(true);
+            return Task.FromResult(accessDeleted && refreshDeleted);
         }
         catch (Exception ex)
         {
@@ -301,7 +301,11 @@ public sealed class WindowsCredentialStorage : ITokenStorage
     /// </summary>
     private static bool DeleteCredential(string targetName)
     {
-        return NativeMethods.CredDelete(targetName, NativeMethods.CRED_TYPE_GENERIC, 0);
+        if (NativeMethods.CredDelete(targetName, NativeMethods.CRED_TYPE_GENERIC, 0))
+            return true;
+
+        // Missing credentials are already clean; other failures must be retried.
+        return Marshal.GetLastWin32Error() == 1168; // ERROR_NOT_FOUND
     }
 
     #endregion

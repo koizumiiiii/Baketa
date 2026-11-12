@@ -146,7 +146,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
 
         var userSettings = new Dictionary<string, object>
         {
-            ["useLocalEngine"] = settings.UseLocalEngine,
+            ["useLocalEngine"] = true,
             ["selectedLanguagePair"] = selectedLanguagePair,  // 🔥 新形式
             ["autoDetectSourceLanguage"] = settings.AutoDetectSourceLanguage,
             ["defaultEngine"] = settings.DefaultEngine,
@@ -154,7 +154,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             ["timeoutMs"] = settings.TimeoutMs,
             ["overlayFontSize"] = settings.OverlayFontSize,
             // [Issue #243] Cloud AI翻訳設定を保存
-            ["enableCloudAiTranslation"] = settings.EnableCloudAiTranslation,
+            ["enableCloudAiTranslation"] = false,
             // [Issue #554] EXモード自動ON済みフラグ
             ["exModeAutoEnabled"] = settings.ExModeAutoEnabled
         };
@@ -418,7 +418,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             BaketaConstants.Ocr.DefaultConfidenceThreshold, // デフォルト信頼度しきい値
             appSettings.TimeoutSeconds * 1000, // 秒をミリ秒に変換
             14, // デフォルトフォントサイズ
-            appSettings.EnableCloudAiTranslation); // [Issue #78 Phase 5] Cloud AI翻訳設定
+            false); // Cloud providers are disabled in the local edition.
     }
 
     private UnifiedOcrSettings LoadOcrSettings()
@@ -561,12 +561,12 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             sourceLanguage,
             targetLanguage,
             userSettings.GetValueOrDefault("defaultEngine")?.ToString() ?? appSettings.DefaultEngine.ToString(),
-            GetBoolValue(userSettings, "useLocalEngine", true),
+            true, // Ignore legacy Cloud-only settings.
             GetDoubleValue(userSettings, "confidenceThreshold", 0.7),
             GetIntValue(userSettings, "timeoutMs", appSettings.TimeoutSeconds * 1000),
             GetIntValue(userSettings, "overlayFontSize", 14),
             // [Issue #78 Phase 5] Cloud AI翻訳設定
-            GetBoolValue(userSettings, "enableCloudAiTranslation", appSettings.EnableCloudAiTranslation),
+            false, // Cloud providers are disabled in the local edition.
             // [Issue #554] EXモード自動ON済みフラグ
             GetBoolValue(userSettings, "exModeAutoEnabled", false));
     }

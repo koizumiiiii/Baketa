@@ -123,7 +123,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
 
         // Assert
         viewModel.Should().NotBeNull();
-        viewModel.AllCategories.Should().HaveCount(3); // 一般設定、アカウント、ライセンスの3つ
+        viewModel.AllCategories.Should().HaveCount(1); // Local settings only.
         viewModel.SelectedCategory.Should().NotBeNull();
         viewModel.StatusMessage.Should().Be(string.Empty);
     }
@@ -167,16 +167,14 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             var categories = viewModel.AllCategories;
 
             // Assert
-            categories.Should().HaveCount(3); // 一般設定、アカウント、ライセンスの3つ
+            categories.Should().HaveCount(1); // Local settings only.
 
             // 基本設定カテゴリの確認（DisplayOrder順）
             categories[0].Id.Should().Be("settings_general");
             categories[0].Level.Should().Be(SettingLevel.Basic);
             categories[0].DisplayOrder.Should().Be(1);
 
-            categories[1].Id.Should().Be("settings_account");
-            categories[1].Level.Should().Be(SettingLevel.Basic);
-            categories[1].DisplayOrder.Should().Be(2);
+            categories.Should().NotContain(c => c.Id == "settings_account" || c.Id == "settings_license");
         }
         finally
         {
@@ -198,7 +196,8 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         };
 
         // Act
-        var newCategory = viewModel.AllCategories[1];
+        viewModel.SelectedCategory = null;
+        var newCategory = viewModel.AllCategories[0];
         viewModel.SelectedCategory = newCategory;
 
         // Assert
@@ -354,7 +353,6 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
 
     [Theory]
     [InlineData("settings_general")]
-    [InlineData("settings_account")]
     public void CategorySelection_SpecificCategory_WorksCorrectly(string categoryId)
     {
         // Arrange
@@ -401,9 +399,12 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Arrange
         var viewModel = CreateViewModel();
 
-        // Act & Assert - 一般設定、アカウント、ライセンスの3カテゴリ存在
-        viewModel.AllCategories.Should().HaveCount(3);
+        // Act & Assert - Only local settings are exposed.
+        viewModel.AllCategories.Should().HaveCount(1);
         viewModel.AllCategories.Should().NotBeEmpty();
+        viewModel.AllCategories.Should().NotContain(c => c.Id == "settings_account" || c.Id == "settings_license");
+        _mockServiceProvider.Verify(x => x.GetService(typeof(AccountSettingsViewModel)), Times.Never);
+        _mockServiceProvider.Verify(x => x.GetService(typeof(LicenseInfoViewModel)), Times.Never);
     }
 }
 

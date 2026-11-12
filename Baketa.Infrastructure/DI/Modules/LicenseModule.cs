@@ -32,20 +32,16 @@ public sealed class LicenseModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     public override void RegisterServices(IServiceCollection services)
     {
-        // 設定の登録
-        RegisterSettings(services);
-
-        // コアサービスの登録
-        RegisterCoreServices(services);
-
-        // APIクライアントの登録（モックモード対応）
-        RegisterApiClient(services);
-
-        // 自動同期サービスの登録
-        RegisterAutoSyncService(services);
-
-        // NOTE: IUserPlanService後方互換アダプタはUI層で登録（Clean Architecture準拠）
-        // NOTE: ログ出力はLicenseManagerのコンストラクタで行う
+        // No legacy API clients, timers, credential readers, or sync services are registered.
+        services.AddSingleton<LocalLicenseManager>();
+        services.AddSingleton<ILicenseManager>(provider => provider.GetRequiredService<LocalLicenseManager>());
+        services.AddSingleton<ILicenseInfoProvider>(provider => provider.GetRequiredService<LocalLicenseManager>());
+        services.AddSingleton<NullAccountServices>();
+        services.AddSingleton<IPatreonOAuthService>(provider => provider.GetRequiredService<NullAccountServices>());
+        services.AddSingleton<IPatreonCallbackHandler>(provider => provider.GetRequiredService<NullAccountServices>());
+        services.AddSingleton<IPromotionCodeService>(provider => provider.GetRequiredService<NullAccountServices>());
+        services.AddSingleton<IBonusTokenService>(provider => provider.GetRequiredService<NullAccountServices>());
+        services.AddSingleton<IPromotionSettingsPersistence, License.PromotionSettingsPersistence>();
     }
 
     /// <summary>

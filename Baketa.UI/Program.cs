@@ -67,14 +67,7 @@ internal sealed class Program
     [STAThread]
     public static async Task Main(string[] args)
     {
-        // 🔗 Patreonコールバック URL 検出（baketa://patreon/callback?code=xxx&state=yyy）
-        PendingPatreonCallbackUrl = args.FirstOrDefault(arg =>
-            arg.StartsWith("baketa://", StringComparison.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrEmpty(PendingPatreonCallbackUrl))
-        {
-            Console.WriteLine($"🔗 [OAUTH_CALLBACK] Patreonコールバック URL 検出: {PendingPatreonCallbackUrl[..Math.Min(50, PendingPatreonCallbackUrl.Length)]}...");
-        }
+        // Retired authentication callback arguments are intentionally ignored.
 
         // 🚧 Single Instance Application Check - 重複翻訳表示問題根本解決
         const string mutexName = "Global\\BaketaTranslationOverlayApp_SingleInstance_v3";
@@ -286,12 +279,6 @@ internal sealed class Program
 
             // DIコンテナの初期化
             await ConfigureServices();
-
-            // 🔗 Patreonコールバック処理（DIコンテナ初期化後）
-            if (!string.IsNullOrEmpty(PendingPatreonCallbackUrl))
-            {
-                await ProcessPatreonCallbackAsync().ConfigureAwait(false);
-            }
 
             // 🩺 診断システム直接初期化 - OnFrameworkInitializationCompleted代替
             Console.WriteLine("🚨🚨🚨 [MAIN_DIAGNOSTIC] 診断システム直接初期化開始！ 🚨🚨🚨");

@@ -800,3 +800,6 @@ analytics/data/*
 *.parquet
 *.xlsx
 *.zip.0*
+
+# Codex CLI local config/reports
+.codex/

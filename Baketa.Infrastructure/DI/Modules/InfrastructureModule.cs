@@ -360,7 +360,7 @@ public class InfrastructureModule : ServiceModuleBase
         // 🆕 Issue #273: Cloud翻訳可用性統合サービス
         // ライセンス状態とユーザー設定を統合して一貫した可用性判定を提供
         services.AddSingleton<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService,
-            Baketa.Infrastructure.Translation.Services.CloudTranslationAvailabilityService>();
+            Baketa.Infrastructure.Translation.Services.DisabledCloudTranslationAvailabilityService>();
         Console.WriteLine("✅ [Issue #273] CloudTranslationAvailabilityService登録完了 - ライセンス×設定統合");
     }
 
@@ -604,6 +604,10 @@ public class InfrastructureModule : ServiceModuleBase
         // [Issue #261] 同意管理サービス
         RegisterConsentServices(_1);
 
+        // Analytics is disabled for both infrastructure registration overloads.
+        _1.AddSingleton<Baketa.Core.Abstractions.Services.IUsageAnalyticsService,
+            Baketa.Infrastructure.Analytics.NullUsageAnalyticsService>();
+
         // 統一ログサービス
         RegisterLoggingServices(_1);
     }
@@ -625,7 +629,8 @@ public class InfrastructureModule : ServiceModuleBase
     private static void RegisterConsentServices(IServiceCollection services)
     {
         // 利用規約・プライバシーポリシー同意管理サービス（Singleton: アプリケーション全体で共有）
-        services.AddSingleton<IConsentService, ConsentService>();
+        services.AddSingleton<ConsentService>();
+        services.AddSingleton<IConsentService, LocalConsentService>();
     }
 
     /// <summary>
@@ -956,58 +961,11 @@ public class InfrastructureModule : ServiceModuleBase
             Console.WriteLine("⚠️ CloudTranslationSettings登録完了 - デフォルト値使用");
         }
 
-        // RelayServerClient登録（HttpClientFactory使用）
-        services.AddHttpClient<Translation.Cloud.RelayServerClient>();
-        Console.WriteLine("✅ RelayServerClient登録完了 - HttpClientFactory使用");
-
-        // [Issue #261] Named HttpClient "RelayServer" 登録（ConsentService等で使用）
-        services.AddHttpClient("RelayServer", client =>
-        {
-            client.BaseAddress = new Uri("https://api.baketa.app");
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
-        Console.WriteLine("✅ Named HttpClient [RelayServer] 登録完了");
-
-        // PrimaryCloudTranslator登録（RelayServerClient依存）- Issue #237 Geminiレビュー指摘修正
-        services.AddSingleton<Translation.Cloud.PrimaryCloudTranslator>();
-        Console.WriteLine("✅ PrimaryCloudTranslator登録完了 - Relay Server経由");
-
-        // [Issue #351] DirectGeminiImageTranslator削除 - Relay Server経由に統一
-
-        // DirectOpenAIImageTranslator登録（HttpClientFactory使用）- フォールバック用
-        services.AddHttpClient<Translation.Cloud.DirectOpenAIImageTranslator>();
-        Console.WriteLine("✅ DirectOpenAIImageTranslator登録完了 - HttpClientFactory使用（フォールバック用）");
-
-        // SecondaryCloudTranslator登録（スタブ実装 - Relay Server未対応時のフォールバック用）
-        services.AddSingleton<Translation.Cloud.SecondaryCloudTranslator>();
-        Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - スタブ実装（Relay Server未対応時用）");
-
-        // [Issue #351] Primary Cloud翻訳エンジン登録（簡潔化）
-        // 常にPrimaryCloudTranslator（Relay Server経由）を使用
+        // Phase 1 keeps the abstraction while both cloud providers are unavailable.
         services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>(
-            "primary",
-            (provider, key) => provider.GetRequiredService<Translation.Cloud.PrimaryCloudTranslator>());
-        Console.WriteLine("✅ Primary Cloud翻訳エンジン登録完了 - Keyed Service [primary] (Relay Server経由)");
-
-        // Secondary Cloud翻訳エンジン - Keyed Service
-        // UseDirectApiMode=true の場合は DirectOpenAIImageTranslator を使用（Gemini失敗時のフォールバック）
-        // UseDirectApiMode=false の場合は SecondaryCloudTranslator（スタブ - Relay Server経由を推奨）
-        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>("secondary", (provider, key) =>
-        {
-            var settings = provider.GetRequiredService<IOptions<Core.Settings.CloudTranslationSettings>>().Value;
-
-            if (settings.UseDirectApiMode && !string.IsNullOrEmpty(settings.DirectOpenAIApiKey))
-            {
-                Console.WriteLine("🔧 [Fallback] Direct APIモード有効 & OpenAI APIキーあり - DirectOpenAIImageTranslator使用");
-                return provider.GetRequiredService<Translation.Cloud.DirectOpenAIImageTranslator>();
-            }
-            else
-            {
-                Console.WriteLine("🔧 [Fallback] SecondaryCloudTranslator（スタブ）使用 - OpenAI APIキー未設定");
-                return provider.GetRequiredService<Translation.Cloud.SecondaryCloudTranslator>();
-            }
-        });
-        Console.WriteLine("✅ Secondary Cloud翻訳エンジン登録完了 - Keyed Service [secondary] (OpenAIフォールバック対応)");
+            "primary", new Translation.Cloud.DisabledCloudImageTranslator("primary"));
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>(
+            "secondary", new Translation.Cloud.DisabledCloudImageTranslator("secondary"));
 
         // FallbackOrchestrator登録
         services.AddSingleton<CoreTranslation.IFallbackOrchestrator, Translation.Services.FallbackOrchestrator>();
@@ -1395,10 +1353,7 @@ public class InfrastructureModule : ServiceModuleBase
         });
         Console.WriteLine("✅ [Issue #256] ComponentInstallerService登録完了");
 
-        // [Issue #269] UsageAnalyticsService登録
-        services.AddSingleton<Baketa.Core.Abstractions.Services.IUsageAnalyticsService,
-            Baketa.Infrastructure.Analytics.UsageAnalyticsService>();
-        Console.WriteLine("✅ [Issue #269] UsageAnalyticsService登録完了");
+
     }
 
     /// <summary>
@@ -1452,24 +1407,6 @@ public class InfrastructureModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     private static void RegisterCrashReportingInfrastructure(IServiceCollection services)
     {
-        Console.WriteLine("🚀 [Issue #287] クラッシュレポート送信インフラストラクチャ登録開始");
-
-        // HttpClient登録（JwtTokenAuthHandler付き）
-        services.AddHttpClient<CrashReporting.CrashReportSender>(
-                CrashReporting.CrashReportSender.HttpClientName)
-            .ConfigureHttpClient(client =>
-            {
-                client.BaseAddress = new Uri("https://api.baketa.app");
-                client.Timeout = TimeSpan.FromSeconds(30);
-                client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
-                client.DefaultRequestHeaders.Add("Accept", "application/json");
-            })
-            .AddHttpMessageHandler<Http.JwtTokenAuthHandler>();
-
-        // ICrashReportSenderインターフェース登録
-        services.AddSingleton<ICrashReportSender>(provider =>
-            provider.GetRequiredService<CrashReporting.CrashReportSender>());
-
-        Console.WriteLine("✅ [Issue #287] CrashReportSender登録完了 - JWT認証付き送信");
+        services.AddSingleton<ICrashReportSender, CrashReporting.NullCrashReportSender>();
     }
 }

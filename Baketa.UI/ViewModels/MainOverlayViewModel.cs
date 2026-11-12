@@ -119,7 +119,7 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [ISSUE#176] 認証サービス設定とイベント購読（ログアウト時のUI状態リセット用）
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-        _authService.AuthStatusChanged += OnAuthStatusChanged;
+        // Account state no longer gates local translation.
 
         // 🔥 [Issue #300] トースト通知サービス設定
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
@@ -163,7 +163,7 @@ public class MainOverlayViewModel : ViewModelBase
         _ = Task.Run(MonitorOcrInitializationAsync);
 
         // 🔥 [ISSUE#176] 認証状態を初期化（起動時のログイン状態を取得）
-        _ = Task.Run(InitializeAuthStateAsync);
+        // No authentication initialization is needed for local translation.
 
         InitializeCommands();
         InitializeEventHandlers();
@@ -202,7 +202,7 @@ public class MainOverlayViewModel : ViewModelBase
     /// 🔥 [Issue #318] EXモード（Cloud AI翻訳）が有効かどうか
     /// UseLocalEngine=falseの場合にEXモードが有効
     /// </summary>
-    public bool IsEXModeEnabled => !_unifiedSettingsService.GetTranslationSettings().UseLocalEngine;
+    public bool IsEXModeEnabled => false;
 
     /// <summary>
     /// 🔥 [ISSUE#163_PHASE4] 現在の翻訳モード（None/Live/Singleshot）
@@ -610,16 +610,13 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
     // UI状態の計算プロパティ
-    public bool ShowHideEnabled => !_isAuthenticationMode && IsTranslationActive; // 認証モード中または翻訳中でない場合は無効
-    public bool SettingsEnabled => !_isAuthenticationMode && !IsLoading && !IsTranslationActive; // 認証モード中、ローディング中、翻訳実行中は無効
-    public bool IsSelectWindowEnabled => !_isAuthenticationMode && IsOcrInitialized && !IsLoading && _isLoggedIn; // 認証モード中またはOCR未初期化またはローディング中またはログアウト時は無効
+    public bool ShowHideEnabled => IsTranslationActive;
+    public bool SettingsEnabled => !IsLoading && !IsTranslationActive;
+    public bool IsSelectWindowEnabled => IsOcrInitialized && !IsLoading;
     public bool IsStartStopEnabled
     {
         get
         {
-            // 🔥 [ISSUE#167] 認証モード中は無効
-            if (_isAuthenticationMode) return false;
-
             // 🔥 [PHASE6.1_ROOT_CAUSE_FIX] Start/Stop両方の条件を正しく実装
             // 🔥 [PHASE5.2E] ウォームアップ完了条件追加 - Startボタン押下前に全準備完了を保証
             // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ウォームアップ完了、ローディング中でない、翻訳中でない
@@ -709,9 +706,6 @@ public class MainOverlayViewModel : ViewModelBase
     {
         get
         {
-            // 🔥 [ISSUE#167] 認証モード中は無効
-            if (_isAuthenticationMode) return false;
-
             // 条件: ウィンドウ選択済み、OCR初期化完了、イベントハンドラー初期化完了、
             //       翻訳エンジン初期化中でない、ウォームアップ完了、
             //       （Live翻訳中でない OR オーバーレイ表示中）、ローディング中でない

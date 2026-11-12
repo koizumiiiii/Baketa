@@ -226,80 +226,14 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
     /// <summary>
     /// CloudOnlyエンジンの状態をチェック
     /// </summary>
-    private async Task CheckCloudEngineStatusAsync()
+    private Task CheckCloudEngineStatusAsync()
     {
-        try
-        {
-            var wasOnline = CloudEngineStatus.IsOnline;
-            var wasHealthy = CloudEngineStatus.IsHealthy;
-
-            // ネットワーク接続が必要
-            if (!NetworkStatus.IsConnected)
-            {
-                CloudEngineStatus.IsOnline = false;
-                CloudEngineStatus.IsHealthy = false;
-                CloudEngineStatus.LastError = "ネットワーク接続なし";
-            }
-            else
-            {
-                // TODO: 実際のクラウドエンジンAPI呼び出し実装
-                var healthCheckResult = await CheckCloudEngineHealthAsync().ConfigureAwait(false);
-
-                CloudEngineStatus.IsOnline = healthCheckResult.IsOnline;
-                CloudEngineStatus.IsHealthy = healthCheckResult.IsHealthy;
-                CloudEngineStatus.RemainingRequests = healthCheckResult.RemainingRequests;
-                CloudEngineStatus.RateLimitReset = healthCheckResult.RateLimitReset;
-                CloudEngineStatus.LastError = healthCheckResult.LastError;
-            }
-
-            CloudEngineStatus.LastChecked = DateTime.Now;
-
-            if (wasOnline != CloudEngineStatus.IsOnline || wasHealthy != CloudEngineStatus.IsHealthy)
-            {
-                await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.HealthCheck).ConfigureAwait(false);
-            }
-
-            // レート制限警告
-            if (CloudEngineStatus.RemainingRequests <= _options.RateLimitWarningThreshold)
-            {
-                await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.RateLimitUpdate,
-                    CloudEngineStatus.RemainingRequests).ConfigureAwait(false);
-            }
-        }
-        catch (TaskCanceledException ex)
-        {
-            // タイムアウトまたはキャンセル
-            CloudEngineStatus.IsOnline = false;
-            CloudEngineStatus.IsHealthy = false;
-            CloudEngineStatus.LastError = "接続タイムアウト";
-            CloudEngineStatus.LastChecked = DateTime.Now;
-
-            _logger.LogWarning(ex, "CloudOnlyエンジンの接続がタイムアウトしました");
-
-            await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.ErrorOccurred, "接続タイムアウト").ConfigureAwait(false);
-        }
-        catch (System.Net.Http.HttpRequestException ex)
-        {
-            // HTTP通信エラー
-            CloudEngineStatus.IsOnline = false;
-            CloudEngineStatus.IsHealthy = false;
-            CloudEngineStatus.LastError = $"HTTP通信エラー: {ex.Message}";
-            CloudEngineStatus.LastChecked = DateTime.Now;
-
-            _logger.LogWarning(ex, "CloudOnlyエンジンのHTTP通信に失敗しました");
-
-            await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.ErrorOccurred, ex.Message).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
-        {
-            // 予期される終了時例外
-            CloudEngineStatus.IsOnline = false;
-            CloudEngineStatus.IsHealthy = false;
-            CloudEngineStatus.LastError = "ヘルスチェックが中断されました";
-            CloudEngineStatus.LastChecked = DateTime.Now;
-
-            _logger.LogDebug(ex, "CloudOnlyエンジンのヘルスチェックが中断されました");
-        }
+        // Cloud translation is unavailable in the local-only release; do not probe APIs.
+        CloudEngineStatus.IsOnline = false;
+        CloudEngineStatus.IsHealthy = false;
+        CloudEngineStatus.RemainingRequests = 0;
+        CloudEngineStatus.LastChecked = DateTime.Now;
+        return Task.CompletedTask;
     }
 
     /// <summary>

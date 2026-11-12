@@ -72,6 +72,26 @@ public class DefaultTranslationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task TranslateBatchAsync_WithLegacyRelayClient_UsesLocalEngine()
+    {
+        // Arrange: an invalid URL makes any accidental Relay request fail immediately.
+        using var relay = new Baketa.Infrastructure.Translation.Services.TextTranslationClient(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Baketa.Infrastructure.Translation.Services.TextTranslationClient>.Instance,
+            "invalid://disabled");
+        var service = new DefaultTranslationService(_loggerMock.Object, [_mockEngine1],
+            _configurationMock.Object, textTranslationClient: relay);
+
+        // Act
+        var result = await service.TranslateBatchAsync(["Hello"], Language.English, Language.Japanese);
+
+        // Assert
+        Assert.False(service.HasTextTranslationFallback);
+        Assert.Single(result);
+        Assert.Equal("MockTranslationEngine", result[0].EngineName);
+        Assert.True(result[0].IsSuccess);
+    }
+
+    [Fact]
     public void GetAvailableEngines_ReturnsAllRegisteredEngines()
     {
         // Act

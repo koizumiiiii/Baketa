@@ -463,9 +463,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 3: ローディング画面クローズ完了");
                         _logger?.LogInformation("ローディング画面クローズ完了");
 
-                        // --- 3.5 [Issue #252] クラッシュレポート検出・ダイアログ表示 ---
-                        await CheckAndShowCrashReportDialogAsync(serviceProvider);
-
                         // --- 3.6 [Issue #261] プライバシーポリシー同意確認 ---
                         var consentAccepted = await CheckAndShowConsentDialogAsync(serviceProvider);
                         if (!consentAccepted)
@@ -475,67 +472,13 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             return;
                         }
 
-                        // --- 4. 認証状態チェックとメインUI表示 ---
-                        Console.WriteLine("📌 [AUTH_DEBUG] Step 4: 認証状態チェック開始");
-                        _logger?.LogInformation("認証状態をチェック中...");
-
-                        var authService = serviceProvider.GetRequiredService<IAuthService>();
-                        var tokenStorage = serviceProvider.GetRequiredService<ITokenStorage>();
-
-                        // [Issue #299] AuthInitializationService.StartAsync()で既にセッション復元済み
-                        // ここでは現在のセッションを取得するだけでよい（重複呼び出し防止）
-                        bool isAuthenticated = false;
-                        try
-                        {
-                            var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
-                            isAuthenticated = session != null;
-                            if (isAuthenticated && session?.User?.Id != null && !string.IsNullOrEmpty(session.AccessToken))
-                            {
-                                _logger?.LogInformation("[Issue #299] 既存セッション検出（AuthInitializationServiceで復元済み）");
-
-                                // [Issue #261] 認証成功時にローカル同意をDBに同期
-                                var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
-                                if (consentService != null)
-                                {
-                                    await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
-                                }
-                            }
-                            else
-                            {
-                                _logger?.LogInformation("[Issue #299] セッションなし、未認証状態");
-                            }
-                        }
-                        catch (Exception authEx)
-                        {
-                            _logger?.LogWarning(authEx, "セッション復元中にエラー発生、ログイン画面を表示します");
-                            isAuthenticated = false;
-
-                            // セキュリティ強化: 不正なトークンを削除
-                            try
-                            {
-                                _logger?.LogWarning("[TOKEN_CLEAR][Path-5] App.axaml.cs: GetCurrentSessionAsync failed during startup — clearing stored tokens. Error={Error}", authEx.Message);
-                                await tokenStorage.ClearTokensAsync().ConfigureAwait(true);
-                                _logger?.LogInformation("[TOKEN_CLEAR][Path-5] セッション復元失敗に伴い、保存されたトークンをクリアしました");
-                            }
-                            catch (Exception clearEx)
-                            {
-                                _logger?.LogError(clearEx, "トークンクリア中にエラー発生");
-                            }
-                        }
-
-                        Console.WriteLine($"📌 [AUTH_DEBUG] Step 4: 認証チェック完了 isAuthenticated={isAuthenticated}");
-
-                        // --- 4.9 [Issue #275] トークン使用量の起動時同期 ---
-                        // 設定画面を開く前にLicenseManagerに実際のトークン使用量を同期
-                        await SyncTokenUsageAtStartupAsync(serviceProvider).ConfigureAwait(true);
-
+                        // Local-only startup does not restore remote sessions or synchronize usage.
                         // --- 4.10 [Issue #335] 起動時ハードウェアチェック ---
                         await PerformHardwareCheckAsync(serviceProvider);
 
                         // 🔥 [ISSUE#167] 常にMainOverlayViewを最初に表示
-                        // 認証前はExitボタンのみ有効、認証後は全ボタン有効
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 5: MainOverlayView表示開始");
-                        _logger?.LogInformation("MainOverlayViewを表示します（認証状態: {IsAuthenticated}）", isAuthenticated);
+                        _logger?.LogInformation("MainOverlayViewを表示します");
 
                         var mainOverlayViewModel = serviceProvider.GetRequiredService<MainOverlayViewModel>();
                         if (Program.IsEventHandlerInitialized)
@@ -543,8 +486,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             mainOverlayViewModel.IsEventHandlerInitialized = true;
                         }
 
-                        // 認証状態に応じてモードを設定
-                        mainOverlayViewModel.SetAuthenticationMode(!isAuthenticated);
+                        // Local translation is available without an account.
+                        mainOverlayViewModel.SetAuthenticationMode(false);
 
                         var mainOverlayView = new MainOverlayView { DataContext = mainOverlayViewModel };
                         var mainIconUri = new Uri(BAKETA_ICON_PATH);
@@ -557,34 +500,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         // --- 4.4 自動アップデートチェック（Issue #249） ---
                         await InitializeUpdateServiceAsync(serviceProvider);
 
-                        // --- 4.5 Patreon認証結果の通知表示（Issue #233） ---
-                        await ShowPendingPatreonNotificationAsync(serviceProvider);
-
-                        // --- 4.6 [Issue #545] ウェルカムボーナス通知 ---
-                        CheckAndShowWelcomeBonusAsync(serviceProvider);
-
-                        // 未認証の場合はSignupViewをダイアログとして表示（初回起動時はサインアップを推奨）
-                        if (!isAuthenticated)
-                        {
-                            Console.WriteLine("📌 [AUTH_DEBUG] Step 6: SignupViewダイアログ表示（未認証）");
-                            _logger?.LogInformation("未認証: SignupViewをダイアログとして表示します");
-
-                            // 認証完了後にダイアログが閉じるよう、非同期で表示
-                            _ = Task.Run(async () =>
-                            {
-                                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
-                                {
-                                    var signupViewModel = serviceProvider.GetRequiredService<SignupViewModel>();
-                                    var signupView = new SignupView(signupViewModel);
-                                    var signupIconUri = new Uri(BAKETA_ICON_PATH);
-                                    signupView.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(signupIconUri));
-
-                                    await signupView.ShowDialog<bool?>(mainOverlayView);
-                                    Console.WriteLine("✅ SignupViewダイアログ終了");
-                                });
-                            });
-                        }
-
                         // --- 5. その他の初期化とイベントハンドラ登録 ---
                         _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
 
@@ -594,8 +509,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         var translationFlowModule = new Baketa.UI.DI.Modules.TranslationFlowModule();
                         translationFlowModule.ConfigureEventAggregator(_eventAggregator, serviceProvider);
 
-                        // --- 5.1 トークン有効期限切れハンドラー登録 (Issue #168) ---
-                        SetupTokenExpirationHandler(serviceProvider, mainOverlayView);
 
                         _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
                         _logStartupCompleted(_logger, null);
@@ -705,17 +618,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     _logger?.LogWarning(ocrRecoveryEx, "[Issue #300] OcrRecoveryEventProcessor登録失敗（継続）");
                 }
 
-                // 🔔 [Issue #78 Phase 5] TokenUsageAlertService初期化
-                // トークン使用量80%/90%/100%到達時のトースト通知サービス
-                try
-                {
-                    _ = serviceProvider.GetRequiredService<Services.TokenUsageAlertService>();
-                    Console.WriteLine("✅ TokenUsageAlertService初期化完了");
-                }
-                catch (Exception alertEx)
-                {
-                    _logger?.LogWarning(alertEx, "TokenUsageAlertService初期化失敗");
-                }
             }
             catch (InvalidOperationException ex)
             {
@@ -1301,7 +1203,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // [Issue #277] 認証済みの場合、サーバーから同期してからローカル状態をチェック
             // AuthInitializationService.StartAsync()はIHostedServiceとして非同期で実行されるため、
             // ここで明示的に同期を待つ必要がある
-            await TrySyncConsentFromServerAsync(serviceProvider, consentService).ConfigureAwait(true);
+            // Consent is stored locally; retired services are never contacted.
 
             // [Gemini Review] 非同期化: UIスレッドブロック回避
             // 初回起動時の同意が必要か確認
@@ -1347,7 +1249,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
                 // [Issue #277] 認証済みの場合、同意をサーバーに即時同期
                 // これによりPC移行時にDBから同意状態を復元可能になる
-                await TrySyncConsentToServerAsync(serviceProvider, consentService).ConfigureAwait(true);
+                // Consent is stored locally only.
 
                 return true;
             }
