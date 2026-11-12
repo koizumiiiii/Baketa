@@ -98,7 +98,7 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
             try
             {
                 // Cloud AI翻訳を使用するかどうかで分岐
-                if (request.UseCloudTranslation && _fallbackOrchestrator != null && !string.IsNullOrEmpty(request.SessionToken))
+                if (request.UseCloudTranslation && _fallbackOrchestrator != null)
                 {
                     return await ExecuteParallelTranslationAsync(request, overallStopwatch, cancellationToken)
                         .ConfigureAwait(false);
@@ -234,7 +234,7 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
                     Width = request.ImageWidth,
                     Height = request.ImageHeight,
                     Context = request.Context,
-                    SessionToken = request.SessionToken!
+                    SessionToken = request.SessionToken ?? string.Empty
                 };
 
                 var result = await _fallbackOrchestrator!.TranslateWithFallbackAsync(imageRequest, cloudCts.Token)

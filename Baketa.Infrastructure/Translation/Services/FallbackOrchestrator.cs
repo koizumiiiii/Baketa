@@ -196,10 +196,13 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
                 });
 
                 // [Issue #521] ヘルスチェック失敗は一時的 → 短いクールダウン
-                _engineStatusManager.MarkEngineUnavailable(
-                    engineKey,
-                    HealthCheckCooldown,
-                    "可用性チェック失敗");
+                if (!translator.ManagesOwnCooldown)
+                {
+                    _engineStatusManager.MarkEngineUnavailable(
+                        engineKey,
+                        HealthCheckCooldown,
+                        "可用性チェック失敗");
+                }
 
                 return null;
             }
@@ -309,7 +312,7 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
             });
 
             // リトライ不可エラーの場合はエンジンを一時的に無効化
-            if (response.Error?.IsRetryable == false)
+            if (!translator.ManagesOwnCooldown && response.Error?.IsRetryable == false)
             {
                 _engineStatusManager.MarkEngineUnavailable(
                     engineKey,

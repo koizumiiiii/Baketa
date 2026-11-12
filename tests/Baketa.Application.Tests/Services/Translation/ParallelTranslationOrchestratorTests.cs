@@ -188,7 +188,7 @@ public class ParallelTranslationOrchestratorTests : IDisposable
     }
 
     [Fact]
-    public async Task TranslateAsync_WithoutSessionToken_ReturnsLocalOnlyResult()
+    public async Task TranslateAsync_WithoutSessionToken_ExecutesByokCloudTranslation()
     {
         // Arrange
         var chunks = CreateTestChunks(1);
@@ -201,12 +201,18 @@ public class ParallelTranslationOrchestratorTests : IDisposable
             SessionToken = null // セッショントークンなし
         };
 
+        var cloudResponse = ImageTranslationResponse.Success("byok", "Hello", "こんにちは", "primary", TokenUsageDetail.Empty, TimeSpan.Zero);
+        _fallbackOrchestratorMock.Setup(x => x.TranslateWithFallbackAsync(It.IsAny<ImageTranslationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FallbackTranslationResult.Success(cloudResponse, FallbackLevel.Primary, []));
+
         // Act
         var result = await _orchestrator.TranslateAsync(request);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.EngineUsed.Should().Be(TranslationEngineUsed.LocalOnly);
+        _fallbackOrchestratorMock.Verify(x => x.TranslateWithFallbackAsync(
+            It.Is<ImageTranslationRequest>(r => r.SessionToken == string.Empty), It.IsAny<CancellationToken>()), Times.Once);
+        result.CloudTranslationResponse.Should().NotBeNull();
     }
 
     [Fact]

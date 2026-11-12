@@ -16,6 +16,9 @@ public interface ICloudImageTranslator : IAsyncDisposable
     /// </summary>
     string DisplayName { get; }
 
+    /// <summary>Whether availability and API failure cooldowns are managed by this translator.</summary>
+    bool ManagesOwnCooldown => false;
+
     /// <summary>
     /// エンジンが利用可能かチェック
     /// </summary>

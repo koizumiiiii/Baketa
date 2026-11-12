@@ -1822,4 +1822,25 @@ Action: Please restart the app.</value>
     <value>OK</value>
   </data>
 
+  <data name="Gemini_Title" xml:space="preserve"><value>Gemini translation (recommended)</value></data>
+  <data name="Gemini_Description" xml:space="preserve"><value>Save your own Gemini API key to enable image translation. Without a key, or on failure, local translation is used.</value></data>
+  <data name="Gemini_Key" xml:space="preserve"><value>Gemini API key</value></data>
+  <data name="Gemini_SaveKey" xml:space="preserve"><value>Save key</value></data>
+  <data name="Gemini_DeleteKey" xml:space="preserve"><value>Delete key</value></data>
+  <data name="Gemini_Test" xml:space="preserve"><value>Test saved key</value></data>
+  <data name="Gemini_Model" xml:space="preserve"><value>Model</value></data>
+  <data name="Gemini_Preferred" xml:space="preserve"><value>Use Gemini (turn off for local translation)</value></data>
+  <data name="Gemini_SaveOptions" xml:space="preserve"><value>Save model and translation preference</value></data>
+  <data name="Gemini_GetKey" xml:space="preserve"><value>Get an API key in Google AI Studio</value></data>
+  <data name="Gemini_Privacy" xml:space="preserve"><value>On the free tier, submitted images may be used to improve Google services.</value></data>
+  <data name="Gemini_Billing" xml:space="preserve"><value>API charges and rate limits depend on your Google account.</value></data>
+  <data name="Gemini_KeySaved" xml:space="preserve"><value>Key saved (hidden). Gemini is enabled.</value></data>
+  <data name="Gemini_NoKey" xml:space="preserve"><value>No key saved: local translation is used.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>Connection test succeeded.</value></data>
+  <data name="Gemini_TestFailed" xml:space="preserve"><value>Connection failed. Check the saved key, network and API limits.</value></data>
+  <data name="Gemini_OptionsSaved" xml:space="preserve"><value>Model and translation preference saved.</value></data>
+  <data name="Gemini_SettingsFailed" xml:space="preserve"><value>Settings operation failed. Check your input and access to the storage location.</value></data>
+  <data name="Gemini_RateLimited" xml:space="preserve"><value>Gemini rate limit reached. Local translation is used during cooldown.</value></data>
+  <data name="Gemini_InvalidKey" xml:space="preserve"><value>Gemini API key could not be used. Using local translation. Check the key and API permissions in settings and save again.</value></data>
+  <data name="Gemini_Failed" xml:space="preserve"><value>Gemini translation failed. Switching to local translation. Check your network and API settings.</value></data>
 </root>

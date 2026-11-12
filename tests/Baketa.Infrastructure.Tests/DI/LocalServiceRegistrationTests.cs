@@ -25,11 +25,13 @@ namespace Baketa.Infrastructure.Tests.DI;
 public class LocalServiceRegistrationTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RegisterServices_BothInfrastructureOverloads_ResolveOnlyLocalExternalServiceBoundaries(bool withConfiguration)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task RegisterServices_BothInfrastructureOverloads_ResolveByokWithoutRetiredServices(bool withConfiguration, bool hasKey)
     {
-        // Arrange: old cloud preferences must not reactivate any remote implementation.
+        // Legacy cloud preferences must not reactivate retired network services.
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Translation:EnableCloudAiTranslation"] = "true",
@@ -46,6 +48,13 @@ public class LocalServiceRegistrationTests
         else
             module.RegisterServices(services);
 
+        // Never read or mutate the real user profile in registration tests.
+        var byok = new Mock<IGeminiSettingsService>();
+        byok.SetupGet(x => x.HasApiKey).Returns(hasKey);
+        byok.SetupGet(x => x.PreferGemini).Returns(true);
+        byok.SetupGet(x => x.Model).Returns("gemini-flash-lite-latest");
+        byok.Setup(x => x.SetOptionsAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        services.AddSingleton(byok.Object);
         var http = new Mock<IHttpClientFactory>(MockBehavior.Strict);
         services.AddSingleton(http.Object);
         await using var provider = services.BuildServiceProvider();
@@ -62,12 +71,12 @@ public class LocalServiceRegistrationTests
         await consent.SyncLocalConsentToServerAsync("legacy-user", "legacy-session");
 
         // Assert: both overloads expose the same network-free boundaries.
-        Assert.IsType<DisabledCloudImageTranslator>(primary);
+        Assert.IsType<GeminiImageTranslator>(primary);
         Assert.IsType<DisabledCloudImageTranslator>(secondary);
-        Assert.False(await primary.IsAvailableAsync());
+        Assert.Equal(hasKey, await primary.IsAvailableAsync());
         Assert.False(await secondary.IsAvailableAsync());
-        Assert.IsType<DisabledCloudTranslationAvailabilityService>(availability);
-        Assert.False(availability.IsEffectivelyEnabled);
+        Assert.IsType<GeminiTranslationAvailabilityService>(availability);
+        Assert.Equal(hasKey, availability.IsEffectivelyEnabled);
         Assert.IsType<NullUsageAnalyticsService>(analytics);
         Assert.False(analytics.IsEnabled);
         Assert.False(await analytics.FlushAsync());
