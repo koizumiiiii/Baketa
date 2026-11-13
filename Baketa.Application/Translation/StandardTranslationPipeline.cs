@@ -106,7 +106,7 @@ public sealed class StandardTranslationPipeline(
                     request.SourceText,
                     request.SourceLanguage.Code.ToString(),
                     request.TargetLanguage.Code.ToString(),
-                    preferredEngine ?? "any");
+                    (_engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase) || e.Aliases.Contains(preferredEngine ?? "", StringComparer.OrdinalIgnoreCase)) ?? _engines.FirstOrDefault())?.Name ?? "any");
 
                 var cachedEntry = await _cache.GetAsync(cacheKey).ConfigureAwait(false);
                 if (cachedEntry != null)
@@ -165,7 +165,7 @@ public sealed class StandardTranslationPipeline(
 
             if (!string.IsNullOrEmpty(preferredEngine))
             {
-                engine = _engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase))
+                engine = _engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase) || e.Aliases.Contains(preferredEngine, StringComparer.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException($"指定された翻訳エンジン '{preferredEngine}' が見つかりません。");
             }
             else
@@ -198,7 +198,7 @@ public sealed class StandardTranslationPipeline(
             var response = TranslationResponse.CreateSuccess(
                 request,
                 engineResponse.TranslatedText ?? string.Empty,
-                engine.Name,
+                engineResponse.EngineName,
                 stopwatch.ElapsedMilliseconds
             );
 
@@ -224,7 +224,7 @@ public sealed class StandardTranslationPipeline(
                 request.SourceText,
                 request.SourceLanguage.Code.ToString(),
                 request.TargetLanguage.Code.ToString(),
-                engine.Name);
+                response.EngineName);
 
                 var cacheEntry = new TranslationCacheEntry
                 {
@@ -232,7 +232,7 @@ public sealed class StandardTranslationPipeline(
                     TranslatedText = response.TranslatedText ?? string.Empty,
                     SourceLanguage = request.SourceLanguage.Code,
                     TargetLanguage = request.TargetLanguage.Code,
-                    Engine = engine.Name,
+                    Engine = response.EngineName,
                     CreatedAt = DateTime.UtcNow,
                     LastAccessedAt = DateTime.UtcNow,
                     AccessCount = 1
@@ -281,7 +281,7 @@ public sealed class StandardTranslationPipeline(
                     TargetLanguage = request.TargetLanguage.Code,
                     TranslatedText = response.TranslatedText ?? string.Empty,
                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                    TranslationEngine = engine.Name,
+                    TranslationEngine = response.EngineName,
                     // FromCacheプロパティは存在しないため、メタデータに情報を追加
                     // FromCache = false,
                     // Timestampは読み取り専用プロパティのためコメントアウト
@@ -301,7 +301,7 @@ public sealed class StandardTranslationPipeline(
                     TargetLanguage = request.TargetLanguage.Code,
                     ErrorMessage = response.Error?.Message ?? "未知のエラー",
                     ErrorType = TranslationErrorType.Engine,
-                    TranslationEngine = engine.Name,
+                    TranslationEngine = response.EngineName,
                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                     // Timestampは読み取り専用プロパティのためコメントアウト
                     // Timestamp = DateTimeOffset.UtcNow
@@ -557,7 +557,7 @@ public sealed class StandardTranslationPipeline(
 
                 if (!string.IsNullOrEmpty(preferredEngine))
                 {
-                    engine = _engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase))
+                    engine = _engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase) || e.Aliases.Contains(preferredEngine, StringComparer.OrdinalIgnoreCase))
                         ?? throw new InvalidOperationException($"指定された翻訳エンジン '{preferredEngine}' が見つかりません。");
                 }
                 else
@@ -734,7 +734,7 @@ public sealed class StandardTranslationPipeline(
                         var response = TranslationResponse.CreateSuccess(
                             originalRequest,
                             engineResponse.TranslatedText ?? string.Empty,
-                            engine.Name,
+                            engineResponse.EngineName,
                             stopwatch.ElapsedMilliseconds
                         );
 
@@ -765,7 +765,7 @@ public sealed class StandardTranslationPipeline(
                                     originalRequest.SourceText,
                                     originalRequest.SourceLanguage.Code.ToString(),
                                     originalRequest.TargetLanguage.Code.ToString(),
-                                    engine.Name);
+                                    response.EngineName);
 
                                 var cacheEntry = new TranslationCacheEntry
                                 {
@@ -773,7 +773,7 @@ public sealed class StandardTranslationPipeline(
                                     TranslatedText = response.TranslatedText ?? string.Empty,
                                     SourceLanguage = originalRequest.SourceLanguage.Code,
                                     TargetLanguage = originalRequest.TargetLanguage.Code,
-                                    Engine = engine.Name,
+                                    Engine = response.EngineName,
                                     CreatedAt = DateTime.UtcNow,
                                     LastAccessedAt = DateTime.UtcNow,
                                     AccessCount = 1
@@ -801,7 +801,7 @@ public sealed class StandardTranslationPipeline(
                                 TargetLanguage = originalRequest.TargetLanguage.Code,
                                 TranslatedText = response.TranslatedText ?? string.Empty,
                                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                                TranslationEngine = engine.Name,
+                                TranslationEngine = response.EngineName,
                                 FromCache = false,
                                 // Timestampは読み取り専用プロパティのためコメントアウト
                                 // Timestamp = DateTimeOffset.UtcNow
@@ -818,7 +818,7 @@ public sealed class StandardTranslationPipeline(
                                 TargetLanguage = originalRequest.TargetLanguage.Code,
                                 ErrorMessage = response.Error?.Message ?? "未知のエラー",
                                 ErrorType = response.Error?.ErrorType ?? TranslationErrorType.Unknown,
-                                TranslationEngine = engine.Name,
+                                TranslationEngine = response.EngineName,
                                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                                 // Timestampは読み取り専用プロパティのためコメントアウト
                                 // Timestamp = DateTimeOffset.UtcNow

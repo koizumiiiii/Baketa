@@ -47,6 +47,8 @@ public static class SettingsModule
         });
 
         services.AddTransient<GeminiSettingsViewModel>();
+        services.AddTransient<GoogleTranslationSettingsViewModel>();
+        services.AddTransient<TranslationMethodViewModel>();
         services.AddSingleton<Core.Abstractions.Translation.IGeminiNotificationService, GeminiNotificationService>();
 
         // 一般設定ViewModel（ランタイム設定を読み込むファクトリ登録）
@@ -99,7 +101,9 @@ public static class SettingsModule
                 bonusTokenService,
                 unifiedSettingsService,
                 tokenTracker,
-                provider.GetRequiredService<GeminiSettingsViewModel>());
+                provider.GetRequiredService<GeminiSettingsViewModel>(),
+                provider.GetRequiredService<GoogleTranslationSettingsViewModel>(),
+                provider.GetRequiredService<TranslationMethodViewModel>());
         });
 
         // アカウント設定ViewModel

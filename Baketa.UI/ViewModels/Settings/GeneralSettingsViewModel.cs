@@ -32,6 +32,8 @@ namespace Baketa.UI.ViewModels.Settings;
 public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 {
     public GeminiSettingsViewModel? Gemini { get; }
+    public GoogleTranslationSettingsViewModel? Google { get; }
+    public TranslationMethodViewModel? TranslationMethod { get; }
 
     private readonly GeneralSettings _originalSettings;
     private readonly TranslationSettings _originalTranslationSettings;
@@ -107,7 +109,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         IBonusTokenService? bonusTokenService = null,
         IUnifiedSettingsService? unifiedSettingsService = null,
         ITokenConsumptionTracker? tokenTracker = null,
-        GeminiSettingsViewModel? gemini = null) : base(eventAggregator)
+        GeminiSettingsViewModel? gemini = null,
+        GoogleTranslationSettingsViewModel? google = null, TranslationMethodViewModel? translationMethod = null) : base(eventAggregator)
     {
         _originalSettings = settings ?? throw new ArgumentNullException(nameof(settings));
         _originalTranslationSettings = translationSettings ?? new TranslationSettings();
@@ -119,7 +122,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _unifiedSettingsService = unifiedSettingsService;
         _tokenTracker = tokenTracker;
         Gemini = gemini;
+        Google = google;
+        TranslationMethod = translationMethod;
         if (gemini != null) Disposables.Add(gemini);
+        if (google != null) Disposables.Add(google);
+        if (translationMethod != null) Disposables.Add(translationMethod);
 
         // [Issue #78 Phase 5] ライセンス状態変更時のUI更新を購読
         if (_licenseManager != null)

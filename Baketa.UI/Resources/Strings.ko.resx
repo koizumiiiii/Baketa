@@ -1842,9 +1842,9 @@
   </data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>키가 저장되어 있습니다(숨김).</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
-    <value>저장된 키가 없습니다. 로컬 번역을 사용합니다.</value>
+    <value>저장된 키가 없습니다.</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 연결을 확인했습니다. Gemini로 번역합니다.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 키가 저장되었습니다(연결 확인 완료).</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>연결을 확인하지 못했습니다. 키가 저장되지 않았습니다. 다시 시도하세요.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>설정 작업에 실패했습니다. 입력 내용과 저장 위치에 대한 접근 권한을 확인하세요.</value>
@@ -1877,4 +1877,36 @@
   <data name="Gemini_Method" xml:space="preserve"><value>번역 방식:</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>로컬</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ 키가 저장되었습니다(연결 확인 완료).</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>확인 중…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>Google 번역 요청 한도에 도달했습니다. 대기 중에는 로컬 번역을 사용합니다.</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>요청 한도에 도달했습니다. 잠시 후 다시 시도하세요.</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>저장</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>처리 중…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>Google Cloud API 키와 결제 계정 등록이 필요합니다(무료 사용량 제공). 예상치 못한 요금을 제한하려면 일일 할당량을 설정하세요.</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① API 키 받기 ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>연결을 확인하지 못했습니다. 키가 저장되지 않았습니다. 다시 시도하세요.</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>Google 번역 API 키를 사용할 수 없습니다. 로컬 번역을 사용합니다. 설정에서 키와 API 권한을 확인한 후 다시 저장하세요.</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>키 삭제</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>연결 테스트 시간이 초과되었습니다. 다시 시도하세요.</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Google 번역 API 키</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>키가 저장되어 있습니다(숨김).</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>설정 작업에 실패했습니다. 입력 내용과 저장 위치에 대한 접근 권한을 확인하세요.</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>Google Cloud API 키와 결제 계정 등록이 필요합니다(무료 사용량 제공). 예상치 못한 요금을 제한하려면 일일 할당량을 설정하세요.</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>저장된 키가 없습니다.</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Google 번역 번역에 실패했습니다. 로컬 번역으로 전환합니다. 네트워크 및 API 설정을 확인하세요.</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>연결할 수 없습니다. 네트워크 연결을 확인하세요.</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>API 키가 유효하지 않거나 액세스가 거부되었습니다.</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>번역할 텍스트가 Google로 전송됩니다.</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Google 번역</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>Cloud Translation API 사용 설정 ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>요금 ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>일일 할당량 설정 ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>Google Cloud 콘솔에서 Cloud Translation API를 사용 설정하세요.</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>Google Cloud에서 결제 계정을 설정해야 합니다.</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>접근이 거부되었습니다. API 키 제한과 권한을 확인하세요.</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>Google 번역을 사용할 수 없어 이번에는 로컬 번역을 사용합니다.</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>API 키는 저장되었지만 번역 방식을 저장하지 못했습니다. 번역 방식을 다시 선택하세요.</value>
+  </data>
 </root>

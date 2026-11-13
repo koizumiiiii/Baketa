@@ -1842,9 +1842,9 @@ Ação: Reinicie o aplicativo.</value>
   </data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>Chave salva (oculta).</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
-    <value>Nenhuma chave salva: a tradução local é usada.</value>
+    <value>Nenhuma chave salva.</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Conexão verificada. O Gemini será usado para traduzir.</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ Chave salva (conexão verificada).</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>Falha na conexão. A chave não foi salva. Tente novamente.</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>Falha na operação de configuração. Verifique os dados inseridos e o acesso ao local de armazenamento.</value>
@@ -1877,4 +1877,36 @@ Ação: Reinicie o aplicativo.</value>
   <data name="Gemini_Method" xml:space="preserve"><value>Método de tradução:</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>Local</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ Chave salva (conexão verificada).</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>Verificando…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>O limite de solicitações do Google Tradutor foi atingido. A tradução local é usada durante o período de espera.</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>Limite de solicitações atingido. Tente novamente mais tarde.</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>Salvar</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>Processando…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>Requer uma chave de API do Google Cloud e uma conta de faturamento (há uma cota gratuita). Defina uma cota diária para limitar cobranças inesperadas.</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① Obter uma chave de API ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>Falha na conexão. A chave não foi salva. Tente novamente.</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>Não foi possível usar a chave de API do Google Tradutor. A tradução local será usada. Verifique a chave e as permissões da API nas configurações e salve a chave novamente.</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>Excluir chave</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>O teste de conexão excedeu o tempo limite. Tente novamente.</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Chave de API do Google Tradutor</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>Chave salva (oculta).</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>Falha na operação de configuração. Verifique os dados inseridos e o acesso ao local de armazenamento.</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>Requer uma chave de API do Google Cloud e uma conta de faturamento (há uma cota gratuita). Defina uma cota diária para limitar cobranças inesperadas.</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>Nenhuma chave salva.</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Falha na tradução com Google Tradutor. Alternando para a tradução local. Verifique as configurações de rede e da API.</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>Não foi possível conectar. Verifique sua conexão de rede.</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>A chave de API é inválida ou o acesso foi negado.</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>O texto a traduzir é enviado ao Google.</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Google Tradutor</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>Ativar Cloud Translation API ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>Preços ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>Definir cota diária ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>Ative a Cloud Translation API no console do Google Cloud.</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>Configure uma conta de faturamento no Google Cloud.</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>Acesso negado. Verifique as restrições e permissões da chave de API.</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>O Google Tradutor está indisponível. A tradução local será usada.</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>A chave de API foi salva, mas não foi possível salvar o método de tradução. Selecione o método novamente.</value>
+  </data>
 </root>

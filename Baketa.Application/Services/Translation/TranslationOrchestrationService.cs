@@ -124,6 +124,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     // 前回のキャプチャ画像（差分検出用）
     private IImage? _previousCapturedImage;
+    private readonly ITranslationMethodService? _translationMethods;
+    private int _translationMethodInvalidated;
     private readonly object _previousImageLock = new();
 
     // 翻訳完了後の一時停止制御
@@ -203,7 +205,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #525] Detection-Onlyキャッシュ
         Baketa.Core.Abstractions.Services.IImageChangeDetectionService? imageChangeDetectionService = null, // [Issue #525] 画像変化検知キャッシュ
         ILogger<TranslationOrchestrationService>? logger = null,
-        Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudAvailability = null)
+        Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudAvailability = null,
+        ITranslationMethodService? translationMethods = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
@@ -221,6 +224,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationDictionaryService = translationDictionaryService;
         _fallbackOrchestrator = fallbackOrchestrator;
         _cloudAvailability = cloudAvailability;
+        _translationMethods = translationMethods;
+        if (_translationMethods != null) _translationMethods.Changed += OnTranslationMethodChanged;
         _licenseManager = licenseManager;
         _speculativeOcrService = speculativeOcrService;
         _windowManagerAdapter = windowManagerAdapter;
@@ -972,6 +977,28 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// Detection-Onlyフィルタのバウンディングボックスキャッシュ、画像変化検知キャッシュ、
     /// テキスト変化検知キャッシュをすべてリセットし、次回翻訳時にフレッシュな検出を保証する。
     /// </summary>
+    private void OnTranslationMethodChanged(object? sender, EventArgs e)
+    {
+        // Defer invalidation until the in-flight translation finishes so it cannot
+        // repopulate the caches after they have been cleared.
+        Interlocked.Exchange(ref _translationMethodInvalidated, 1);
+    }
+
+    private void ApplyTranslationMethodChange()
+    {
+        if (Interlocked.Exchange(ref _translationMethodInvalidated, 0) == 0) return;
+        lock (_previousImageLock)
+        {
+            _previousCapturedImage?.Dispose();
+            _previousCapturedImage = null;
+        }
+        ClearAllDetectionCaches();
+        _coordinateBasedTranslation?.ResetTranslationState();
+        _cloudTranslationCache?.ClearAll();
+        lock (_lastTranslatedTextLock) _lastTranslatedText = string.Empty;
+        lock (_lastTranslationTimeLock) _lastTranslationCompletedAt = DateTime.MinValue;
+    }
+
     private void ClearAllDetectionCaches()
     {
         _textChangeDetectionService?.ClearAllPreviousTexts();
@@ -1413,6 +1440,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     return TranslationStepResult.TranslationInFlight;
                 }
             }
+
+            ApplyTranslationMethodChange();
 
             // [Issue #436] クールダウンチェック（キャプチャ・変化検知前）
             // GridHashCache保全: Cooldown中は検知をスキップし、解除後に正しく変化を検出
@@ -3086,6 +3115,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     public void Dispose()
     {
         if (_disposed) return;
+
+        if (_translationMethods != null) _translationMethods.Changed -= OnTranslationMethodChanged;
 
         _logger?.LogDebug("TranslationOrchestrationServiceを破棄します");
 

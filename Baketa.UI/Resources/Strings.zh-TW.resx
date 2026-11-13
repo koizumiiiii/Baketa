@@ -1842,9 +1842,9 @@
   </data>
   <data name="Gemini_KeySaved" xml:space="preserve"><value>金鑰已儲存（已隱藏）。</value></data>
   <data name="Gemini_NoKey" xml:space="preserve">
-    <value>未儲存金鑰：將使用本機翻譯。</value>
+    <value>尚未儲存金鑰。</value>
   </data>
-  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 已確認連線。將使用 Gemini 翻譯。</value></data>
+  <data name="Gemini_TestSuccess" xml:space="preserve"><value>✓ 金鑰已儲存（連線已驗證）。</value></data>
   <data name="Gemini_TestFailed" xml:space="preserve"><value>無法確認連線。金鑰尚未儲存，請重試。</value></data>
   <data name="Gemini_SettingsFailed" xml:space="preserve">
     <value>設定操作失敗。請檢查輸入內容以及儲存位置的存取權限。</value>
@@ -1877,4 +1877,36 @@
   <data name="Gemini_Method" xml:space="preserve"><value>翻譯方式：</value></data>
   <data name="Gemini_MethodLocal" xml:space="preserve"><value>本機</value></data>
   <data name="Gemini_MethodGemini" xml:space="preserve"><value>Gemini</value></data>
+  <data name="Google_TestSuccess" xml:space="preserve"><value>✓ 金鑰已儲存（連線已驗證）。</value></data>
+  <data name="Google_Checking" xml:space="preserve"><value>確認中…</value></data>
+  <data name="Google_RateLimited" xml:space="preserve"><value>已達到 Google翻譯 速率限制。等待期間將使用本機翻譯。</value></data>
+  <data name="Google_TestRateLimited" xml:space="preserve"><value>已達到請求頻率限制。請稍後再試。</value></data>
+  <data name="Google_SaveKey" xml:space="preserve"><value>儲存</value></data>
+  <data name="Google_Processing" xml:space="preserve"><value>處理中…</value></data>
+  <data name="Google_Billing" xml:space="preserve"><value>需要 Google Cloud API 金鑰和帳單帳戶（提供免費額度）。建議設定每日配額以限制非預期費用。</value></data>
+  <data name="Google_GetKey" xml:space="preserve"><value>① 取得 API 金鑰 ↗</value></data>
+  <data name="Google_TestFailed" xml:space="preserve"><value>無法確認連線。金鑰尚未儲存，請重試。</value></data>
+  <data name="Google_InvalidKey" xml:space="preserve"><value>無法使用 Google翻譯 API 金鑰。將使用本機翻譯。請在設定中檢查金鑰和 API 權限，然後重新儲存。</value></data>
+  <data name="Google_DeleteKey" xml:space="preserve"><value>刪除金鑰</value></data>
+  <data name="Google_TestTimeout" xml:space="preserve"><value>連線測試逾時。請重試。</value></data>
+  <data name="Google_Key" xml:space="preserve"><value>② Google翻譯 API 金鑰</value></data>
+  <data name="Google_KeySaved" xml:space="preserve"><value>金鑰已儲存（已隱藏）。</value></data>
+  <data name="Google_SettingsFailed" xml:space="preserve"><value>設定操作失敗。請檢查輸入內容以及儲存位置的存取權限。</value></data>
+  <data name="Google_Description" xml:space="preserve"><value>需要 Google Cloud API 金鑰和帳單帳戶（提供免費額度）。建議設定每日配額以限制非預期費用。</value></data>
+  <data name="Google_NoKey" xml:space="preserve"><value>尚未儲存金鑰。</value></data>
+  <data name="Google_Failed" xml:space="preserve"><value>Google翻譯 翻譯失敗。正在切換至本機翻譯。請檢查網路和 API 設定。</value></data>
+  <data name="Google_TestNetworkError" xml:space="preserve"><value>無法連線。請檢查網路連線。</value></data>
+  <data name="Google_TestInvalidKey" xml:space="preserve"><value>API 金鑰無效或存取遭拒。</value></data>
+  <data name="Google_Privacy" xml:space="preserve"><value>待翻譯文字將傳送給 Google。</value></data>
+  <data name="Google_Title" xml:space="preserve"><value>Google翻譯</value></data>
+  <data name="Google_EnableApi" xml:space="preserve"><value>啟用 Cloud Translation API ↗</value></data>
+  <data name="Google_Pricing" xml:space="preserve"><value>價格 ↗</value></data>
+  <data name="Google_Quota" xml:space="preserve"><value>設定每日配額 ↗</value></data>
+  <data name="Google_ServiceDisabled" xml:space="preserve"><value>請在 Google Cloud 控制台啟用 Cloud Translation API。</value></data>
+  <data name="Google_BillingDisabled" xml:space="preserve"><value>請在 Google Cloud 設定帳單帳戶。</value></data>
+  <data name="Google_Forbidden" xml:space="preserve"><value>存取遭拒。請檢查 API 金鑰限制和權限。</value></data>
+  <data name="Google_Fallback" xml:space="preserve"><value>Google翻譯無法使用，本次將使用本機翻譯。</value></data>
+  <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
+    <value>API 金鑰已儲存，但翻譯方式儲存失敗。請重新選擇翻譯方式。</value>
+  </data>
 </root>
