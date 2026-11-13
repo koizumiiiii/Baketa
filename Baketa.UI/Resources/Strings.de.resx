@@ -1909,4 +1909,24 @@ Maßnahme: Bitte starten Sie die App neu.</value>
   <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
     <value>Der API-Schlüssel wurde gespeichert, aber die Übersetzungsmethode konnte nicht gespeichert werden. Wählen Sie die Methode erneut.</value>
   </data>
+  <data name="FinalRelease_Title" xml:space="preserve">
+    <value>Letzte Version von Baketa</value>
+  </data>
+  <data name="FinalRelease_Message" xml:space="preserve">
+    <value>Die Entwicklung von Baketa wurde eingestellt. Es wird keine weiteren Updates, Wartung oder Unterstützung geben.
+
+Kostenpflichtige Abonnements (Patreon), die Kontoanmeldung und die von Baketa bereitgestellte Cloud AI-Übersetzung wurden eingestellt.
+
+Die lokale Übersetzung (NLLB) bleibt kostenlos. Sie können Gemini / Google Cloud Translation auch mit Ihrem eigenen API-Schlüssel verwenden (es können Gebühren des Anbieters anfallen). Wählen Sie in den Einstellungen eine Übersetzungsmethode und geben Sie Ihren API-Schlüssel ein.
+
+Diese Version führt eine Migration durch, um alte Anmeldedaten und bekannte Lizenzdaten von diesem PC zu entfernen. Fehlgeschlagene Löschvorgänge werden beim nächsten Start erneut versucht. Dies bedeutet nicht, dass serverseitige Daten gelöscht wurden.
+
+Anfragen zur Datenlöschung: privacy@baketa.app</value>
+  </data>
+  <data name="FinalRelease_OpenSettings" xml:space="preserve">
+    <value>Übersetzungseinstellungen öffnen</value>
+  </data>
+  <data name="FinalRelease_Close" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
 </root>

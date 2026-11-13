@@ -11,6 +11,9 @@ namespace Baketa.Core.Settings;
 /// </summary>
 public sealed class AppSettings
 {
+    /// <summary>Whether the final release notice has been acknowledged.</summary>
+    public bool FinalReleaseNoticeAcknowledged { get; set; }
+
     /// <summary>
     /// 設定スキーマバージョン（マイグレーション用）
     /// </summary>

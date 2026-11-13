@@ -296,6 +296,28 @@ jobs:
         @"
         ## Baketa $version
 
+        ### 開発終了のお知らせ / End of development
+
+        Baketa の開発は終了しました。今後のアップデート・保守・サポートは行いません。
+
+        有料プラン（Patreon）、アカウントログイン、Baketa 提供の Cloud AI 翻訳は終了しました。
+
+        ローカル翻訳（NLLB）は引き続き無料で利用できます。自分の API キーで Gemini / Google Cloud Translation も利用できます（API 提供元の利用料金が発生する場合があります）。設定画面の「翻訳方式」で選択し、API キーを設定してください。
+
+        このバージョンでは、旧版のログイン情報と既知のライセンス情報をこの PC から削除する移行処理を行います。削除に失敗した場合は次回起動時に再試行します。サーバー上のデータ削除を意味するものではありません。
+
+        データ削除のお問い合わせ: privacy@baketa.app
+
+        Development of Baketa has ended. There will be no further updates, maintenance, or support.
+
+        Paid plans (Patreon), account login, and Baketa-provided Cloud AI translation have ended.
+
+        Local translation (NLLB) remains free. You can also use Gemini / Google Cloud Translation with your own API key (provider charges may apply). Choose a translation method and enter your API key in Settings.
+
+        This version runs a migration to remove old login credentials and known license data from this PC. Failed deletions are retried on the next launch. This does not mean that server-side data has been deleted.
+
+        Data deletion inquiries: privacy@baketa.app
+
         ### Downloads
 
         | File | Description |
@@ -309,15 +331,14 @@ jobs:
 
         1. Download ``Baketa.zip``
         2. Extract to desired location
-        3. Run ``Baketa.UI.exe``
+        3. Run ``Baketa.exe``
         4. On first run, required components will be downloaded automatically from [Model Assets v3](https://github.com/koizumiiiii/Baketa/releases/tag/models-v3)
 
-        ### Auto-Update
+        ### Updating from an older version
 
-        Baketa supports automatic updates. When a new version is available:
-        - You'll see an update notification on startup
-        - Click to download and install the update automatically
-        - The application will restart with the new version
+        Older installations can use their update notification to install this final release.
+        This final release does not check for application updates automatically or manually.
+        The signed appcast remains available for older clients migrating to this version.
 
         ### Auto-Downloaded Components (from models-v3)
 
@@ -328,8 +349,8 @@ jobs:
         ### System Requirements
 
         - Windows 10/11 (x64)
-        - Internet connection (for first-time setup and auto-updates)
-        - ~3GB disk space (including auto-downloaded components)
+        - Internet connection for initial component/OCR model downloads and BYOK cloud translation; local translation works offline after setup
+        - Disk space for application, components, and OCR models (requirements vary by CPU/CUDA package)
         "@ | Out-File -FilePath "release_notes.md" -Encoding utf8
 
     - name: Create Release

@@ -38,6 +38,7 @@ internal sealed class UIModule : ServiceModuleBase
 
         // ViewModelの登録
         RegisterViewModels(services);
+        services.AddTransient<FinalReleaseNoticeViewModel>();
 
         // UI関連サービスの登録
         RegisterUIServices(services);
