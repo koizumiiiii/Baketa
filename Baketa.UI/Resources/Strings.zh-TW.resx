@@ -1909,4 +1909,24 @@
   <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
     <value>API 金鑰已儲存，但翻譯方式儲存失敗。請重新選擇翻譯方式。</value>
   </data>
+  <data name="FinalRelease_Title" xml:space="preserve">
+    <value>Baketa 最終版本</value>
+  </data>
+  <data name="FinalRelease_Message" xml:space="preserve">
+    <value>Baketa 的開發已結束。今後將不再提供更新、維護或支援。
+
+付費方案（Patreon）、帳號登入以及 Baketa 提供的 Cloud AI 翻譯均已停止服務。
+
+本機翻譯（NLLB）仍可免費使用。您也可以使用自己的 API 金鑰來使用 Gemini / Google Cloud Translation（供應商可能會收取使用費用）。請在設定中選擇翻譯方式並輸入 API 金鑰。
+
+此版本會執行移轉，從這台 PC 中刪除舊的登入認證和已知的授權資料。刪除失敗的項目將在下次啟動時重試。這並不表示伺服器端的資料已被刪除。
+
+資料刪除諮詢：privacy@baketa.app</value>
+  </data>
+  <data name="FinalRelease_OpenSettings" xml:space="preserve">
+    <value>開啟翻譯設定</value>
+  </data>
+  <data name="FinalRelease_Close" xml:space="preserve">
+    <value>關閉</value>
+  </data>
 </root>

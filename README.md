@@ -64,6 +64,15 @@ copy /b BaketaUnifiedServer-cuda.zip.001+BaketaUnifiedServer-cuda.zip.002 Baketa
 
 上記の検証ファイルが存在すればインストール済みとして扱われます。`component-metadata/*.meta.json` の作成は不要で、起動時の更新確認や再取得は行いません。`tokenizer.json` が不足している場合のみ、別途補完取得されます。
 
+#### Surya OCR モデル重みの手動配置
+
+Surya のモデル重みは初回 OCR 時に `https://models.datalab.to` から自動取得されます。標準のキャッシュ先は `%LOCALAPPDATA%\datalab\datalab\Cache\models` です。
+
+- 検出: `text_detection\2025_05_07`（約74MB）
+- 認識: `text_recognition\2025_09_23`（約1.4GB）
+
+取得できない環境では、同じバージョンで OCR が動作している PC と移行先の Baketa を終了し、動作している PC の上記 `models` フォルダを移行先の同じパスへコピーしてください。フォルダ構造と付随ファイルを含めてコピーします。サイズは目安です。`MODEL_CACHE_DIR` などを環境設定で変更している場合は、実際のキャッシュ先を使用してください。
+
 ### 開発者向け
 
 ```bash

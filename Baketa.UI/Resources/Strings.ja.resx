@@ -1889,4 +1889,24 @@
   <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
     <value>APIキーは保存済みですが、翻訳方式を保存できませんでした。翻訳方式を選び直してください。</value>
   </data>
+  <data name="FinalRelease_Title" xml:space="preserve">
+    <value>Baketa 最終版のお知らせ</value>
+  </data>
+  <data name="FinalRelease_Message" xml:space="preserve">
+    <value>Baketa の開発は終了しました。今後のアップデート・保守・サポートは行いません。
+
+有料プラン（Patreon）、アカウントログイン、Baketa 提供の Cloud AI 翻訳は終了しました。
+
+ローカル翻訳（NLLB）は引き続き無料で利用できます。自分の API キーで Gemini / Google Cloud Translation も利用できます（API 提供元の利用料金が発生する場合があります）。設定画面の「翻訳方式」で選択し、API キーを設定してください。
+
+このバージョンでは、旧版のログイン情報と既知のライセンス情報をこの PC から削除する移行処理を行います。削除に失敗した場合は次回起動時に再試行します。サーバー上のデータ削除を意味するものではありません。
+
+データ削除のお問い合わせ: privacy@baketa.app</value>
+  </data>
+  <data name="FinalRelease_OpenSettings" xml:space="preserve">
+    <value>翻訳方式の設定を開く</value>
+  </data>
+  <data name="FinalRelease_Close" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
 </root>

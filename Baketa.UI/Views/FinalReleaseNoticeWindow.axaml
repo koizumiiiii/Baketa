@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        x:Class="Baketa.UI.Views.FinalReleaseNoticeWindow"
+        x:DataType="vm:FinalReleaseNoticeViewModel"
+        Title="{Binding Title}" Width="620" Height="470"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SystemRegionBrush}">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="24">
+        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,16"/>
+        <ScrollViewer Grid.Row="1">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap"/>
+        </ScrollViewer>
+        <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="{Binding OpenSettingsText}" Click="OnOpenSettingsClick" Margin="0,0,12,8"/>
+            <Button Content="{Binding CloseText}" Click="OnCloseClick" Margin="0,0,0,8"/>
+        </WrapPanel>
+    </Grid>
+</Window>

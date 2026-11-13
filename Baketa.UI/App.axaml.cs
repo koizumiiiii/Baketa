@@ -76,12 +76,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     private LoadingWindow? _earlyLoadingWindow;
 
     /// <summary>
-    /// [Issue #249] 自動アップデートサービス
-    /// NetSparkleを使用してGitHub Releasesからアップデートを確認・適用
-    /// </summary>
-    private UpdateService? _updateService;
-
-    /// <summary>
     /// [Issue #245] 保存されたテーマを適用
     /// 設定ファイルを直接読み込んでテーマを設定
     /// </summary>
@@ -419,27 +413,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             _logger?.LogInformation("LoadingViewModel設定完了（フォールバック）");
                         }
 
-                        // --- 1.5 [Issue #511] 早期アップデートチェック（初期化ハング対策） ---
-                        _logger?.LogInformation("[Issue #511] 早期アップデートチェック開始");
-                        try
-                        {
-                            var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
-                            var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
-                            _updateService = new UpdateService(pythonServerManager, updateLogger);
-
-                            var updateFound = await _updateService.CheckForUpdatesEarlyAsync(3000);
-                            if (updateFound)
-                            {
-                                _logger?.LogInformation("[Issue #511] 更新検出 - ユーザーに通知済み");
-                                // 「今すぐ更新」→ NetSparkleがDL＆再起動を処理
-                                // 「スキップ」→ 通常の初期化に進む
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, "[Issue #511] 早期アップデートチェック失敗（継続）");
-                        }
-
                         // --- 2. アプリケーション初期化 ---
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 2: アプリケーション初期化開始");
                         var loadingStartTime = System.Diagnostics.Stopwatch.StartNew();
@@ -497,9 +470,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         mainOverlayView.Show();
                         Console.WriteLine("✅ MainOverlayView.Show()実行完了");
 
-                        // --- 4.4 自動アップデートチェック（Issue #249） ---
-                        await InitializeUpdateServiceAsync(serviceProvider);
-
                         // --- 5. その他の初期化とイベントハンドラ登録 ---
                         _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
 
@@ -536,6 +506,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
                         desktop.ShutdownRequested += OnShutdownRequested;
                         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+
+                        // 起動時ダイアログとイベント登録の完了後に最終リリースを案内する。
+                        await ShowFinalReleaseNoticeAsync(serviceProvider, mainOverlayView);
                     }
                     catch (Exception ex)
                     {
@@ -921,53 +894,21 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         }
     }
 
-    /// <summary>
-    /// [Issue #249] 自動アップデートサービスの初期化
-    /// アプリ起動時にサイレントで更新チェックを実行
-    /// </summary>
-    private async Task InitializeUpdateServiceAsync(IServiceProvider serviceProvider)
+    private async Task ShowFinalReleaseNoticeAsync(IServiceProvider serviceProvider, Window owner)
     {
         try
         {
-            // [Issue #511] 早期チェックで既に初期化済みの場合はスキップ
-            // [Issue #546] 早期チェック（CheckForUpdatesEarlyAsync）で既にAppCastを取得済みのため、
-            // 再度のバックグラウンドチェックは不要（重複リクエスト防止）
-            if (_updateService != null)
-            {
-                _logger?.LogInformation("[Issue #546] UpdateService既に初期化済み - 重複チェックをスキップ");
-                return;
-            }
+            var viewModel = serviceProvider.GetRequiredService<FinalReleaseNoticeViewModel>();
+            if (!viewModel.ShouldShow) return;
 
-            // フォールバック: 早期チェックが実行されなかった場合の既存ロジック
-            _logger?.LogInformation("[Issue #249] UpdateService初期化開始...");
-
-            var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
-            var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
-
-            _updateService = new UpdateService(pythonServerManager, updateLogger);
-            _updateService.Initialize();
-
-            // バックグラウンドでサイレント更新チェック
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    // 起動直後の負荷を避けるため少し待機
-                    await Task.Delay(5000).ConfigureAwait(false);
-                    await _updateService.CheckForUpdatesInBackgroundAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "[Issue #249] サイレント更新チェック失敗（継続）");
-                }
-            });
-
-            _logger?.LogInformation("[Issue #249] UpdateService初期化完了");
+            var dialog = new FinalReleaseNoticeWindow { DataContext = viewModel };
+            var openSettings = await dialog.ShowDialog<bool>(owner);
+            await viewModel.CompleteAsync(openSettings,
+                () => serviceProvider.GetRequiredService<INavigationService>().ShowSettingsAsync(), _logger);
         }
         catch (Exception ex)
         {
-            // 更新チェック失敗はアプリ起動をブロックしない
-            _logger?.LogWarning(ex, "[Issue #249] UpdateService初期化失敗（継続）");
+            _logger?.LogWarning(ex, "Could not complete the final release notice; it will be retried if not saved.");
         }
     }
 
@@ -1638,18 +1579,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 _logger?.LogWarning(analyticsEx, "[Issue #269] session_end 処理失敗（継続）");
             }
 
-            // [Issue #249] UpdateServiceの破棄
-            try
-            {
-                _updateService?.Dispose();
-                _updateService = null;
-                Console.WriteLine("✅ [SHUTDOWN_DEBUG] UpdateService破棄完了");
-            }
-            catch (Exception updateEx)
-            {
-                Console.WriteLine($"⚠️ [SHUTDOWN_DEBUG] UpdateService破棄失敗: {updateEx.Message}");
-            }
-
             // 🔥 [P0_GC_FIX] Win32ウィンドウクラスの完全クリーンアップ
             // WndProcDelegate参照を解放し、UnregisterClassでウィンドウクラス登録解除
             // これにより.NET Hostプロセス残存問題を解決
@@ -1751,9 +1680,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         {
             return;
         }
-
-        _updateService?.Dispose();
-        _updateService = null;
 
         _disposed = true;
     }

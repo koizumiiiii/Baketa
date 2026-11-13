@@ -1909,4 +1909,24 @@ Ação: Reinicie o aplicativo.</value>
   <data name="BYOK_KeySavedMethodFailed" xml:space="preserve">
     <value>A chave de API foi salva, mas não foi possível salvar o método de tradução. Selecione o método novamente.</value>
   </data>
+  <data name="FinalRelease_Title" xml:space="preserve">
+    <value>Versão final do Baketa</value>
+  </data>
+  <data name="FinalRelease_Message" xml:space="preserve">
+    <value>O desenvolvimento do Baketa foi encerrado. Não haverá mais atualizações, manutenção ou suporte.
+
+Os planos pagos (Patreon), o login na conta e a tradução Cloud AI fornecida pelo Baketa foram encerrados.
+
+A tradução local (NLLB) continua gratuita. Você também pode usar Gemini / Google Cloud Translation com sua própria chave API (o provedor poderá cobrar pelo uso). Selecione um método de tradução e insira sua chave API nas configurações.
+
+Esta versão executa uma migração para remover deste PC as credenciais de login antigas e os dados de licença conhecidos. As exclusões que falharem serão tentadas novamente na próxima inicialização. Isso não significa que os dados no servidor tenham sido excluídos.
+
+Dúvidas sobre a exclusão de dados: privacy@baketa.app</value>
+  </data>
+  <data name="FinalRelease_OpenSettings" xml:space="preserve">
+    <value>Abrir configurações de tradução</value>
+  </data>
+  <data name="FinalRelease_Close" xml:space="preserve">
+    <value>Fechar</value>
+  </data>
 </root>
