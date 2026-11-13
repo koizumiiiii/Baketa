@@ -1,3 +1,4 @@
+# For final-release rebuilds, use requirements-lock-cpu.txt or requirements-lock-cuda.txt.
 # OCR Engine Requirements for Issue #189
 # 次世代OCRエンジン移行
 
@@ -13,7 +14,7 @@ numpy>=1.24.0
 # === Surya OCR v0.17.0+ ===
 # Note: surya-ocr requires PyTorch
 # New API: FoundationPredictor, RecognitionPredictor, DetectionPredictor
-surya-ocr>=0.17.0
+surya-ocr>=0.17.0,<0.18
 
 # === PaddleOCR-VL (Vision-Language Model) ===
 # PaddleOCR-VL-0.9B: NaViT + ERNIE-4.5-0.3B based 109-language VLM

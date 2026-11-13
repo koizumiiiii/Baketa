@@ -49,20 +49,20 @@ public interface IComponentDownloader
     Task<bool> EnsureNllbTokenizerAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// [Issue #360] Checks if a component is up-to-date by comparing local version with remote
-    /// Uses HTTP Last-Modified header to detect if remote version is newer
+    /// Checks whether the fixed release component is installed locally.
+    /// Compatibility API: no metadata or HTTP update check is performed.
     /// </summary>
     /// <param name="component">Component to check</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if up-to-date (no update needed), false if outdated or not installed</returns>
+    /// <returns>True if installed, false if missing</returns>
     Task<bool> IsComponentUpToDateAsync(ComponentInfo component, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// [Issue #360] Downloads missing or outdated components
-    /// Checks for updates using HTTP Last-Modified header and re-downloads if newer version available
+    /// Downloads missing components only.
+    /// Compatibility alias for DownloadMissingComponentsAsync; installed files are retained.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Number of components downloaded or updated</returns>
+    /// <returns>Number of missing components downloaded</returns>
     Task<int> DownloadMissingOrOutdatedComponentsAsync(CancellationToken cancellationToken = default);
 }
 

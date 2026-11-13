@@ -32,7 +32,9 @@ public sealed class SettingsServiceModuleTests
         services.AddSingleton(Mock.Of<ISettingsMigrationManager>());
 
         // Act - 設定サービスを登録
-        services.AddSingleton<ISettingsService, EnhancedSettingsService>();
+        services.AddSingleton<ISettingsService>(provider =>
+            ActivatorUtilities.CreateInstance<EnhancedSettingsService>(provider,
+                Path.Combine(Path.GetTempPath(), "BaketaSettingsTests", Guid.NewGuid().ToString("N"), "settings.json")));
 
         var serviceProvider = services.BuildServiceProvider();
 
@@ -54,7 +56,9 @@ public sealed class SettingsServiceModuleTests
         services.AddSingleton(Mock.Of<ILogger<EnhancedSettingsService>>());
         services.AddSingleton(Mock.Of<ISettingMetadataService>());
         services.AddSingleton(Mock.Of<ISettingsMigrationManager>());
-        services.AddSingleton<ISettingsService, EnhancedSettingsService>();
+        services.AddSingleton<ISettingsService>(provider =>
+            ActivatorUtilities.CreateInstance<EnhancedSettingsService>(provider,
+                Path.Combine(Path.GetTempPath(), "BaketaSettingsTests", Guid.NewGuid().ToString("N"), "settings.json")));
 
         var serviceProvider = services.BuildServiceProvider();
 
@@ -81,7 +85,9 @@ public sealed class SettingsServiceModuleTests
         services.AddSingleton(mockLogger.Object);
         services.AddSingleton(mockMetadataService.Object);
         services.AddSingleton(mockMigrationManager.Object);
-        services.AddSingleton<ISettingsService, EnhancedSettingsService>();
+        services.AddSingleton<ISettingsService>(provider =>
+            ActivatorUtilities.CreateInstance<EnhancedSettingsService>(provider,
+                Path.Combine(Path.GetTempPath(), "BaketaSettingsTests", Guid.NewGuid().ToString("N"), "settings.json")));
 
         var serviceProvider = services.BuildServiceProvider();
 
@@ -134,7 +140,9 @@ public sealed class SettingsServiceModuleTests
         services.AddSingleton(mockLogger.Object);
         services.AddSingleton(mockMetadataService.Object);
         services.AddSingleton(mockMigrationManager.Object);
-        services.AddSingleton<ISettingsService, EnhancedSettingsService>();
+        services.AddSingleton<ISettingsService>(provider =>
+            ActivatorUtilities.CreateInstance<EnhancedSettingsService>(provider,
+                Path.Combine(Path.GetTempPath(), "BaketaSettingsTests", Guid.NewGuid().ToString("N"), "settings.json")));
 
         var serviceProvider = services.BuildServiceProvider();
         var settingsService = serviceProvider.GetRequiredService<ISettingsService>();
@@ -168,7 +176,9 @@ public sealed class SettingsServiceModuleTests
         var services = new ServiceCollection();
 
         // 必要な依存関係を登録せずに設定サービスのみ登録
-        services.AddSingleton<ISettingsService, EnhancedSettingsService>();
+        services.AddSingleton<ISettingsService>(provider =>
+            ActivatorUtilities.CreateInstance<EnhancedSettingsService>(provider,
+                Path.Combine(Path.GetTempPath(), "BaketaSettingsTests", Guid.NewGuid().ToString("N"), "settings.json")));
 
         var serviceProvider = services.BuildServiceProvider();
 

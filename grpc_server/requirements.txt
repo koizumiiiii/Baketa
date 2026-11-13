@@ -1,13 +1,12 @@
+# For final-release rebuilds, use requirements-lock-cpu.txt or requirements-lock-cuda.txt.
 # Baketa gRPC OCR Server Dependencies
 # [Issue #458] Translation moved to C# OnnxTranslationEngine
 
 # gRPC (pinned versions for stability)
-# [Issue #212] protobuf 5.x fixed for PyInstaller compatibility
-# - grpcio-tools < 1.70.0 required for Protobuf 5.x code generation
-# - Exact version pinning prevents gencode/runtime version mismatch
+# Match the recorded build environments and generated protobuf runtime.
 grpcio>=1.60.0
-grpcio-tools==1.68.1
-protobuf==5.29.3
+grpcio-tools==1.76.0
+protobuf==6.33.4
 
 # [Issue #328] gRPC Native Health Check
 # Standard grpc.health.v1.Health service for service health monitoring

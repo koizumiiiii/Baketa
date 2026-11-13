@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Migration;
@@ -43,29 +42,9 @@ public class EnhancedSettingsServiceTests : IDisposable
     /// </summary>
     private EnhancedSettingsService CreateService()
     {
-        // Use reflection to bypass constructor parameter issues during testing
         var uniquePath = Path.Combine(Path.GetDirectoryName(_tempSettingsPath)!, $"settings_{Guid.NewGuid():N}.json");
-        var constructor = typeof(EnhancedSettingsService).GetConstructors().First();
-
-        if (constructor.GetParameters().Length == 4)
-        {
-            return (EnhancedSettingsService)constructor.Invoke(
-            [
-                _mockLogger.Object,
-                _mockMetadataService.Object,
-                _mockMigrationManager.Object,
-                uniquePath
-            ]);
-        }
-        else
-        {
-            return (EnhancedSettingsService)constructor.Invoke(
-            [
-                _mockLogger.Object,
-                _mockMetadataService.Object,
-                _mockMigrationManager.Object
-            ]);
-        }
+        return new EnhancedSettingsService(_mockLogger.Object, _mockMetadataService.Object,
+            _mockMigrationManager.Object, uniquePath);
     }
 
     #region コンストラクタテスト

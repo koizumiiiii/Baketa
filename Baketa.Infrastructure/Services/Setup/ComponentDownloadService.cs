@@ -30,7 +30,7 @@ public class ComponentDownloadService : IComponentDownloader
     private const string UnifiedServerComponentId = "unified_server";
 
     // [Issue #185] HuggingFace NLLB tokenizer constants
-    private const string HuggingFaceTokenizerUrl = "https://huggingface.co/facebook/nllb-200-distilled-600M/resolve/main/tokenizer.json";
+    private const string HuggingFaceTokenizerUrl = "https://huggingface.co/facebook/nllb-200-distilled-600M/resolve/f8d333a098d19b4fd9a8b18f94170487ad3f821d/tokenizer.json";
     private const long TokenizerExpectedSizeBytes = 17_331_176; // ~17.3MB
     private const string NllbModelComponentId = "nllb_model";
 
@@ -50,6 +50,18 @@ public class ComponentDownloadService : IComponentDownloader
         HttpClient httpClient,
         IOptions<ComponentDownloadSettings> settings,
         IGpuEnvironmentDetector? gpuDetector = null)
+        : this(logger, httpClient, settings, gpuDetector, BaketaSettingsPaths.BaseDirectory, AppContext.BaseDirectory)
+    {
+    }
+
+    // Isolate installation and metadata paths for tests without changing process-wide state.
+    internal ComponentDownloadService(
+        ILogger<ComponentDownloadService> logger,
+        HttpClient httpClient,
+        IOptions<ComponentDownloadSettings> settings,
+        IGpuEnvironmentDetector? gpuDetector,
+        string appDataPath,
+        string appBasePath)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -60,10 +72,10 @@ public class ComponentDownloadService : IComponentDownloader
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.DownloadTimeoutSeconds);
 
         // [Issue #459] %USERPROFILE%\.baketa に統一
-        _appDataPath = BaketaSettingsPaths.BaseDirectory;
+        _appDataPath = appDataPath;
 
         // Application base path for bundled components
-        _appBasePath = AppContext.BaseDirectory;
+        _appBasePath = appBasePath;
 
         _logger.LogInformation("[Issue #210] ComponentDownloadService initialized (GPU detector: {HasGpuDetector})",
             _gpuDetector != null ? "Available" : "Not available");
@@ -99,7 +111,7 @@ public class ComponentDownloadService : IComponentDownloader
         {
             fileName = config.CudaFileName;
             expectedSize = config.CudaExpectedSizeBytes ?? config.ExpectedSizeBytes;
-            checksum = config.CudaChecksum ?? config.Checksum;
+            checksum = config.CudaChecksum; // CPU and CUDA archives have different hashes.
             splitParts = config.CudaSplitParts ?? 1;
             partChecksums = config.CudaPartChecksums;
 
@@ -243,16 +255,7 @@ public class ComponentDownloadService : IComponentDownloader
                     lastModified = await DownloadFileWithProgressAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
                 }
 
-                // Verify checksum if provided
-                if (!string.IsNullOrEmpty(component.Checksum))
-                {
-                    var actualChecksum = await ComputeChecksumAsync(tempZipPath, cancellationToken).ConfigureAwait(false);
-                    if (!string.Equals(actualChecksum, component.Checksum, StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new InvalidOperationException($"Checksum mismatch for {component.Id}. Expected: {component.Checksum}, Actual: {actualChecksum}");
-                    }
-                    _logger.LogInformation("Checksum verified for {ComponentId}", component.Id);
-                }
+                await VerifyChecksumAsync(tempZipPath, component, cancellationToken).ConfigureAwait(false);
 
                 // [Issue #198] Report extraction start - notify UI that extraction is in progress
                 ReportProgress(
@@ -490,6 +493,7 @@ public class ComponentDownloadService : IComponentDownloader
             DownloadUrl: HuggingFaceTokenizerUrl,
             LocalPath: modelPath,
             ExpectedSizeBytes: TokenizerExpectedSizeBytes,
+            Checksum: "e316b82de11d0f951f370943b3c438311629547285129b0b81dadabd01bca665",
             IsRequired: true);
 
         var tempPath = Path.GetTempFileName();
@@ -497,6 +501,8 @@ public class ComponentDownloadService : IComponentDownloader
         {
             // Download with progress reporting (using shared download method)
             await DownloadFileWithProgressAsync(tokenizerComponent, tempPath, cancellationToken).ConfigureAwait(false);
+
+            await VerifyChecksumAsync(tempPath, tokenizerComponent, cancellationToken).ConfigureAwait(false);
 
             // Move to final destination
             File.Move(tempPath, tokenizerPath, overwrite: true);
@@ -525,188 +531,17 @@ public class ComponentDownloadService : IComponentDownloader
     }
 
     /// <inheritdoc/>
-    public async Task<bool> IsComponentUpToDateAsync(ComponentInfo component, CancellationToken cancellationToken = default)
+    public Task<bool> IsComponentUpToDateAsync(ComponentInfo component, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // First check if component is installed at all
-        var isInstalled = await IsComponentInstalledAsync(component, cancellationToken).ConfigureAwait(false);
-        if (!isInstalled)
-        {
-            _logger.LogDebug("[Issue #360] Component not installed: {ComponentId}", component.Id);
-            return false;
-        }
-
-        // Read local metadata from %APPDATA%\Baketa\component-metadata\
-        var metadataPath = GetMetadataPath(component.Id);
-        var localMetadata = await ReadComponentMetadataAsync(metadataPath, cancellationToken).ConfigureAwait(false);
-
-        if (localMetadata == null)
-        {
-            // No metadata found - assume outdated for safety
-            _logger.LogInformation(
-                "[Issue #360] No metadata found for {ComponentId}, assuming outdated",
-                component.Id);
-            return false;
-        }
-
-        // [Issue #364 改善] アプリバージョンではなくLast-Modifiedのみで判断
-        // Model Assets v2はアプリ更新とは独立して管理される
-        // GitHub Releaseのファイルが更新された時のみ再ダウンロード
-
-        // Fetch remote Last-Modified using HEAD request
-        // [Issue #456] 分割ファイルの場合、ベースURLは存在しないため .001 サフィックス付きURLでチェック
-        try
-        {
-            var versionCheckUrl = component.SplitParts > 1
-                ? $"{component.DownloadUrl}{string.Format(component.SplitPartSuffixFormat, 1)}"
-                : component.DownloadUrl;
-            var remoteLastModified = await GetRemoteLastModifiedAsync(versionCheckUrl, cancellationToken).ConfigureAwait(false);
-
-            if (remoteLastModified == null)
-            {
-                // Cannot determine remote version - assume up to date to avoid unnecessary downloads
-                _logger.LogWarning(
-                    "[Issue #360] Cannot get remote Last-Modified for {ComponentId}, assuming up-to-date",
-                    component.Id);
-                return true;
-            }
-
-            var isUpToDate = localMetadata.LastModified >= remoteLastModified.Value;
-
-            _logger.LogInformation(
-                "[Issue #360] Version check for {ComponentId}: Local={LocalDate:s}, Remote={RemoteDate:s}, UpToDate={IsUpToDate}",
-                component.Id,
-                localMetadata.LastModified,
-                remoteLastModified.Value,
-                isUpToDate);
-
-            return isUpToDate;
-        }
-        catch (HttpRequestException ex)
-        {
-            // Network error - assume up to date to avoid blocking app startup
-            _logger.LogWarning(
-                ex,
-                "[Issue #360] Network error checking version for {ComponentId}, assuming up-to-date",
-                component.Id);
-            return true;
-        }
+        // Final-release assets are fixed; local verification is sufficient, even without metadata.
+        return IsComponentInstalledAsync(component, cancellationToken);
     }
 
     /// <inheritdoc/>
-    public async Task<int> DownloadMissingOrOutdatedComponentsAsync(CancellationToken cancellationToken = default)
+    public Task<int> DownloadMissingOrOutdatedComponentsAsync(CancellationToken cancellationToken = default)
     {
-        var components = await GetRequiredComponentsAsync(cancellationToken).ConfigureAwait(false);
-
-        // Check each component's status (installed AND up-to-date)
-        var checkTasks = components.Select(async component =>
-        {
-            var isInstalled = await IsComponentInstalledAsync(component, cancellationToken).ConfigureAwait(false);
-            if (!isInstalled)
-            {
-                return (component, needsDownload: true, reason: "not installed");
-            }
-
-            var isUpToDate = await IsComponentUpToDateAsync(component, cancellationToken).ConfigureAwait(false);
-            return (component, needsDownload: !isUpToDate, reason: isUpToDate ? "up-to-date" : "outdated");
-        });
-
-        var checkResults = await Task.WhenAll(checkTasks).ConfigureAwait(false);
-
-        // Filter components that need download
-        var componentsToDownload = checkResults
-            .Where(r => r.needsDownload)
-            .Select(r => (r.component, r.reason))
-            .ToList();
-
-        if (componentsToDownload.Count == 0)
-        {
-            _logger.LogInformation("[Issue #360] All components are installed and up-to-date");
-            return 0;
-        }
-
-        _logger.LogInformation(
-            "[Issue #360] Found {Count} components to download/update: {Components}",
-            componentsToDownload.Count,
-            string.Join(", ", componentsToDownload.Select(c => $"{c.component.Id} ({c.reason})")));
-
-        // Download using existing parallel download logic
-        var maxConcurrentDownloads = _settings.MaxConcurrentDownloads > 0 ? _settings.MaxConcurrentDownloads : 2;
-        using var semaphore = new SemaphoreSlim(maxConcurrentDownloads);
-        var downloadCount = 0;
-        var failedComponents = new List<(ComponentInfo Component, Exception Exception)>();
-        var failedComponentsLock = new object();
-        var totalStopwatch = Stopwatch.StartNew();
-
-        var downloadTasks = componentsToDownload.Select(async item =>
-        {
-            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            var componentStopwatch = Stopwatch.StartNew();
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                _logger.LogInformation(
-                    "[Issue #360] Downloading component: {ComponentId} (reason: {Reason})",
-                    item.component.Id, item.reason);
-                await DownloadComponentAsync(item.component, cancellationToken).ConfigureAwait(false);
-                Interlocked.Increment(ref downloadCount);
-                componentStopwatch.Stop();
-                _logger.LogInformation(
-                    "[Issue #360] Completed download: {ComponentId} in {ElapsedMs}ms",
-                    item.component.Id, componentStopwatch.ElapsedMilliseconds);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                componentStopwatch.Stop();
-                _logger.LogWarning(
-                    ex,
-                    "[Issue #360] Failed to download component: {ComponentId} after {ElapsedMs}ms",
-                    item.component.Id, componentStopwatch.ElapsedMilliseconds);
-                lock (failedComponentsLock)
-                {
-                    failedComponents.Add((item.component, ex));
-                }
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        });
-
-        await Task.WhenAll(downloadTasks).ConfigureAwait(false);
-
-        totalStopwatch.Stop();
-        _logger.LogInformation(
-            "[Issue #360] Downloaded {SuccessCount}/{TotalCount} components in {ElapsedMs}ms",
-            downloadCount, componentsToDownload.Count, totalStopwatch.ElapsedMilliseconds);
-
-        // Handle failures
-        if (failedComponents.Count > 0)
-        {
-            var requiredFailures = failedComponents.Where(f => f.Component.IsRequired).ToList();
-            if (requiredFailures.Count > 0)
-            {
-                var failedIds = string.Join(", ", requiredFailures.Select(f => f.Component.Id));
-                _logger.LogError("[Issue #360] Required components failed to download: {FailedIds}", failedIds);
-                throw new AggregateException(
-                    $"Failed to download required components: {failedIds}",
-                    requiredFailures.Select(f => f.Exception));
-            }
-            else
-            {
-                var failedIds = string.Join(", ", failedComponents.Select(f => f.Component.Id));
-                _logger.LogWarning(
-                    "[Issue #360] Optional components failed to download: {FailedIds}. Continuing with partial success.",
-                    failedIds);
-            }
-        }
-
-        return downloadCount;
+        // Preserve the legacy API without performing remote update checks.
+        return DownloadMissingComponentsAsync(cancellationToken);
     }
 
     #region Private Methods
@@ -1042,6 +877,20 @@ public class ComponentDownloadService : IComponentDownloader
         return lastModified;
     }
 
+    private static async Task VerifyChecksumAsync(string path, ComponentInfo component, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(component.Checksum))
+        {
+            return;
+        }
+
+        var actualChecksum = await ComputeChecksumAsync(path, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(actualChecksum, component.Checksum, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Checksum mismatch for {component.Id}. Expected: {component.Checksum}, Actual: {actualChecksum}");
+        }
+    }
+
     private static async Task<string> ComputeChecksumAsync(string filePath, CancellationToken cancellationToken)
     {
         await using var stream = File.OpenRead(filePath);
@@ -1213,9 +1062,9 @@ public class ComponentDownloadService : IComponentDownloader
     /// [Issue #360] Gets the metadata file path for a component
     /// [Issue #459] BaketaSettingsPaths.ComponentMetadataDirectory に統一
     /// </summary>
-    private static string GetMetadataPath(string componentId)
+    private string GetMetadataPath(string componentId)
     {
-        return Path.Combine(BaketaSettingsPaths.ComponentMetadataDirectory, $"{componentId}{MetadataFileExtension}");
+        return Path.Combine(_appDataPath, MetadataDirectoryName, $"{componentId}{MetadataFileExtension}");
     }
 
     /// <summary>
@@ -1271,87 +1120,6 @@ public class ComponentDownloadService : IComponentDownloader
     }
 
     /// <summary>
-    /// [Issue #360] Reads component metadata from local file
-    /// </summary>
-    private async Task<ComponentMetadata?> ReadComponentMetadataAsync(
-        string metadataPath,
-        CancellationToken cancellationToken)
-    {
-        if (!File.Exists(metadataPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            var json = await File.ReadAllTextAsync(metadataPath, cancellationToken).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<ComponentMetadata>(json);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[Issue #360] Failed to read metadata from {Path}", metadataPath);
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// [Issue #360] Gets Last-Modified header from remote URL using HEAD request
-    /// [Gemini Review] Uses short timeout (5s) to avoid blocking app startup
-    /// </summary>
-    private async Task<DateTimeOffset?> GetRemoteLastModifiedAsync(
-        string url,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Head, url);
-            // Bypass cache to get actual remote version
-            request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
-
-            // [Gemini Review] Use short timeout (5s) for version check to avoid startup delay
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-
-            using var response = await _httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                cts.Token).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning(
-                    "[Issue #360] HEAD request failed for {Url}: {StatusCode}",
-                    url, response.StatusCode);
-                return null;
-            }
-
-            // Try Last-Modified header first
-            if (response.Content.Headers.LastModified.HasValue)
-            {
-                return response.Content.Headers.LastModified.Value;
-            }
-
-            // Fallback to Date header
-            if (response.Headers.Date.HasValue)
-            {
-                return response.Headers.Date.Value;
-            }
-
-            return null;
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning("[Issue #360] HEAD request timed out for {Url}", url);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[Issue #360] Failed to get Last-Modified for {Url}", url);
-            return null;
-        }
-    }
-
-    /// <summary>
     /// [Issue #364] 現在のアプリバージョンを取得
     /// </summary>
     /// <remarks>
@@ -1397,7 +1165,7 @@ internal class ComponentMetadata
 
     /// <summary>
     /// [Issue #364] ダウンロード時のアプリバージョン
-    /// バージョンが異なる場合は強制更新を行う
+    /// Informational only; does not trigger updates.
     /// </summary>
     public string AppVersion { get; set; } = string.Empty;
 }

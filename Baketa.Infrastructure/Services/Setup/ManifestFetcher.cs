@@ -1,5 +1,4 @@
 using System.Net.Http;
-using System.Text.Json;
 using Baketa.Infrastructure.Services.Setup.Models;
 using Microsoft.Extensions.Logging;
 
@@ -7,7 +6,7 @@ namespace Baketa.Infrastructure.Services.Setup;
 
 /// <summary>
 /// Issue #256: コンポーネントマニフェスト取得サービス
-/// models-v1リリースからmanifest.jsonを取得し、キャッシュ管理
+/// Final release: remote component update checks are disabled.
 /// </summary>
 public sealed class ManifestFetcher : IManifestFetcher, IDisposable
 {
@@ -15,26 +14,6 @@ public sealed class ManifestFetcher : IManifestFetcher, IDisposable
     private readonly HttpClient _httpClient;
     private readonly SemaphoreSlim _fetchLock = new(1, 1);
     private bool _disposed;
-
-    /// <summary>
-    /// マニフェストURL（raw.githubusercontent.com経由でAPI制限回避）
-    /// </summary>
-    private const string ManifestUrl = "https://raw.githubusercontent.com/koizumiiiii/Baketa/models-v1/manifest.json";
-
-    /// <summary>
-    /// キャッシュ有効期間（1時間）
-    /// </summary>
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
-
-    // キャッシュ
-    private ComponentManifest? _cachedManifest;
-    private DateTimeOffset _cacheExpiry = DateTimeOffset.MinValue;
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
-    };
 
     public ManifestFetcher(
         ILogger<ManifestFetcher> logger,
@@ -50,77 +29,13 @@ public sealed class ManifestFetcher : IManifestFetcher, IDisposable
     /// <summary>
     /// マニフェストを取得（キャッシュ対応）
     /// </summary>
-    public async Task<ComponentManifest?> GetManifestAsync(
+    public Task<ComponentManifest?> GetManifestAsync(
         bool forceRefresh = false,
         CancellationToken cancellationToken = default)
     {
-        // キャッシュ確認（強制更新でない場合）
-        if (!forceRefresh && _cachedManifest != null && DateTimeOffset.UtcNow < _cacheExpiry)
-        {
-            _logger.LogDebug("[Issue #256] Returning cached manifest (expires: {Expiry})", _cacheExpiry);
-            return _cachedManifest;
-        }
-
-        await _fetchLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            // ロック取得後に再度キャッシュ確認（二重フェッチ防止）
-            if (!forceRefresh && _cachedManifest != null && DateTimeOffset.UtcNow < _cacheExpiry)
-            {
-                return _cachedManifest;
-            }
-
-            _logger.LogInformation("[Issue #256] Fetching manifest from: {Url}", ManifestUrl);
-
-            var response = await _httpClient.GetAsync(ManifestUrl, cancellationToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning(
-                    "[Issue #256] Manifest fetch failed: {StatusCode}",
-                    response.StatusCode);
-                return null;
-            }
-
-            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            var manifest = JsonSerializer.Deserialize<ComponentManifest>(json, JsonOptions);
-
-            if (manifest == null)
-            {
-                _logger.LogWarning("[Issue #256] Failed to deserialize manifest");
-                return null;
-            }
-
-            // キャッシュ更新
-            _cachedManifest = manifest;
-            _cacheExpiry = DateTimeOffset.UtcNow.Add(CacheDuration);
-
-            _logger.LogInformation(
-                "[Issue #256] Manifest fetched successfully. Version: {Version}, Components: {Count}",
-                manifest.ManifestVersion,
-                manifest.Components.Count);
-
-            return manifest;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "[Issue #256] Network error fetching manifest");
-            return null;
-        }
-        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
-        {
-            _logger.LogWarning("[Issue #256] Timeout fetching manifest");
-            return null;
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogWarning(ex, "[Issue #256] Invalid manifest JSON");
-            return null;
-        }
-        finally
-        {
-            _fetchLock.Release();
-        }
+        // Final release: components are pinned to models-v3; no remote update manifest exists.
+        _logger.LogDebug("Component update checks are disabled for the final release");
+        return Task.FromResult<ComponentManifest?>(null);
     }
 
     /// <summary>
@@ -128,8 +43,6 @@ public sealed class ManifestFetcher : IManifestFetcher, IDisposable
     /// </summary>
     public void ClearCache()
     {
-        _cachedManifest = null;
-        _cacheExpiry = DateTimeOffset.MinValue;
         _logger.LogDebug("[Issue #256] Manifest cache cleared");
     }
 
@@ -148,7 +61,7 @@ public sealed class ManifestFetcher : IManifestFetcher, IDisposable
         var manifest = await GetManifestAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         if (manifest == null)
         {
-            _logger.LogWarning("[Issue #256] Cannot check for updates: manifest unavailable");
+            _logger.LogDebug("Component updates are disabled");
             return [];
         }
 
