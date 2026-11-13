@@ -127,15 +127,14 @@ Use the automated build script for reliable release package creation:
 ```cmd
 cd grpc_server
 py -3.10 -m venv venv_build
-.\venv_build\Scripts\pip install -r requirements.txt pyinstaller
+.\venv_build\Scripts\pip install -r requirements-lock-cpu.txt
 ```
 
 **CUDA版ビルド環境のセットアップ:**
 ```cmd
 cd grpc_server
 py -3.10 -m venv venv_build_cuda
-.\venv_build_cuda\Scripts\pip install -r requirements.txt pyinstaller
-.\venv_build_cuda\Scripts\pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu126
+.\venv_build_cuda\Scripts\pip install -r requirements-lock-cuda.txt
 ```
 
 ### models-v3 リリース（統合AIサーバー + モデル配布）
@@ -245,7 +244,7 @@ release/
 2. venv_buildの依存関係を更新：
    ```cmd
    cd grpc_server
-   .\venv_build\Scripts\pip install --upgrade protobuf opencv-python-headless grpcio-tools
+   .\venv_build\Scripts\pip install -r requirements-lock-cpu.txt
    ```
 3. PyInstallerで再ビルド：
    ```cmd

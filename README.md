@@ -40,6 +40,30 @@
 2. 任意のフォルダに展開
 3. `Baketa.exe` を実行
 
+### コンポーネントを手動配置する場合
+
+自動取得が利用できない場合は、アプリを終了し、以下の固定ファイルを取得してください。配置先は `Baketa.exe` のあるフォルダを基準とします。
+
+| ファイル（取得元） | SHA-256 |
+|---|---|
+| [CPU版](https://github.com/koizumiiiii/Baketa/releases/download/models-v3/BaketaUnifiedServer-cpu.zip) | `206de3f54cd2eb7ac19bb6c1969bf4f8cb046ae6a67c3b6c84d97ffd69582660` |
+| [CUDA版 .001](https://github.com/koizumiiiii/Baketa/releases/download/models-v3/BaketaUnifiedServer-cuda.zip.001) | `06389f7adf0c8439f82b71ef5beb84bb3a880738c44c000289932bd0a9ab4b21` |
+| [CUDA版 .002](https://github.com/koizumiiiii/Baketa/releases/download/models-v3/BaketaUnifiedServer-cuda.zip.002) | `5ccb1dcb3f3fc2001584c6e17c904ca472de430f27bfeb1be326ba3814b6a1fc` |
+| [NLLBモデル](https://github.com/koizumiiiii/Baketa/releases/download/models-v3/nllb-200-onnx-int8.zip) | `3c9a53969f3153f390f3acf57df4c1262495eb3a57fb6cb1af058b1bb6bae639` |
+| [tokenizer.json（固定コミット）](https://huggingface.co/facebook/nllb-200-distilled-600M/resolve/f8d333a098d19b4fd9a8b18f94170487ad3f821d/tokenizer.json) | `e316b82de11d0f951f370943b3c438311629547285129b0b81dadabd01bca665` |
+
+PowerShellの `Get-FileHash -Algorithm SHA256 <ファイル名>` で各ファイルを検証し、不一致なら配置しないでください。CPU版またはCUDA版のどちらかを選びます。CUDA版は両パーツを検証した後、同じフォルダで**コマンドプロンプト**から結合します（結合後全体のハッシュは未取得）。
+
+```cmd
+copy /b BaketaUnifiedServer-cuda.zip.001+BaketaUnifiedServer-cuda.zip.002 BaketaUnifiedServer-cuda.zip
+```
+
+- サーバーZIPの内容を `grpc_server\BaketaUnifiedServer` に展開し、直下に `BaketaUnifiedServer.exe` がある状態にします。
+- モデルZIPの内容を `Models\nllb-200-onnx-int8` に展開し、直下に `encoder_model_quantized.onnx` がある状態にします。
+- `tokenizer.json` を `Models\nllb-200-onnx-int8\tokenizer.json` に配置します。ZIP内のフォルダ名を二重に重ねないでください。
+
+上記の検証ファイルが存在すればインストール済みとして扱われます。`component-metadata/*.meta.json` の作成は不要で、起動時の更新確認や再取得は行いません。`tokenizer.json` が不足している場合のみ、別途補完取得されます。
+
 ### 開発者向け
 
 ```bash
