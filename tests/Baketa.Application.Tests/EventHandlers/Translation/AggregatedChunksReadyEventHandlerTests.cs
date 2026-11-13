@@ -30,6 +30,44 @@ namespace Baketa.Application.Tests.EventHandlers.Translation;
 public class AggregatedChunksReadyEventHandlerTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteBatchTranslationAsync_WrappedEnglish_PassesJoinedTextToTranslation(bool streaming)
+    {
+        // Arrange
+        const string original = "Shiori\n\"I had a lot of fun, but... I'd rather not step on a\nmanhole for a while. Ehehe.\"";
+        const string expected = "Shiori \"I had a lot of fun, but... I'd rather not step on a manhole for a while. Ehehe.\"";
+        var chunk = CreateChunkWithText(original);
+        var stream = new Mock<IStreamingTranslationService>();
+        stream.Setup(s => s.TranslateBatchWithStreamingAsync(
+                It.IsAny<IList<string>>(), It.IsAny<TranslationLanguage>(), It.IsAny<TranslationLanguage>(),
+                It.IsAny<Action<int, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["翻訳結果"]);
+        var handler = CreateHandlerWithTranslation(out _, out var service, streaming ? stream.Object : null);
+        var method = typeof(AggregatedChunksReadyEventHandler).GetMethod("ExecuteBatchTranslationAsync",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+
+        // Act: Exercise the handler's real batch dispatch, with both downstream services mocked.
+        await (Task<List<string>>)method.Invoke(handler, [new List<TextChunk> { chunk }, CancellationToken.None])!;
+
+        // Assert
+        if (streaming)
+        {
+            stream.Verify(s => s.TranslateBatchWithStreamingAsync(
+                It.Is<IList<string>>(texts => texts.Count == 1 && texts[0] == expected),
+                It.IsAny<TranslationLanguage>(), It.IsAny<TranslationLanguage>(),
+                It.IsAny<Action<int, string>>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+        else
+        {
+            service.Verify(s => s.TranslateAsync(expected,
+                It.IsAny<TranslationLanguage>(), It.IsAny<TranslationLanguage>(),
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+        Assert.Equal(original, chunk.CombinedText);
+    }
+
+    [Theory]
     [InlineData(2000, 1500, 2000, 1500, 400, 150, 400, 300)]
     [InlineData(800, 600, 2000, 1500, 400, 150, 400, 300)]
     [InlineData(768, 432, 1920, 1080, 384, 108, 384, 216)]
@@ -493,7 +531,8 @@ public class AggregatedChunksReadyEventHandlerTests
     /// </summary>
     private static AggregatedChunksReadyEventHandler CreateHandlerWithTranslation(
         out Mock<IOverlayManager> overlayManagerMock,
-        out Mock<Baketa.Core.Abstractions.Translation.ITranslationService> translationServiceMock)
+        out Mock<Baketa.Core.Abstractions.Translation.ITranslationService> translationServiceMock,
+        IStreamingTranslationService? streamingTranslationService = null)
     {
         overlayManagerMock = new Mock<IOverlayManager>();
         translationServiceMock = new Mock<Baketa.Core.Abstractions.Translation.ITranslationService>();
@@ -544,7 +583,8 @@ public class AggregatedChunksReadyEventHandlerTests
             Mock.Of<IEventAggregator>(),
             new Mock<ILogger<AggregatedChunksReadyEventHandler>>().Object,
             coordTransformMock.Object,
-            settingsServiceMock.Object);
+            settingsServiceMock.Object,
+            streamingTranslationService);
     }
 
     /// <summary>

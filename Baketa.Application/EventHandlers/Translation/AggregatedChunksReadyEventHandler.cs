@@ -24,6 +24,7 @@ using Baketa.Core.Models.Text; // [Issue #293] GateRegionInfo用
 using Baketa.Core.Models.Translation;
 using Baketa.Core.Translation.Abstractions; // TranslatedTextItem用
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Translation.Common;
 using Baketa.Application.Services.Translation; // [Issue #291] ITranslationControlService用
 using Baketa.Core.Settings; // [Issue #379] RoiManagerSettings用
 using Microsoft.Extensions.Logging;
@@ -1170,7 +1171,7 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
         // OCRが複数行にわたるテキストを検出した場合、改行が残るがこれは
         // 表示上の折り返しであり文の区切りではないため、翻訳API（DeepL/Google）が
         // 別々の文として翻訳してしまう問題を防止する
-        var batchTexts = chunks.Select(c => c.CombinedText?.Replace("\n", "") ?? "").ToList();
+        var batchTexts = chunks.Select(c => TranslationTextNormalizer.JoinWrappedLines(c.CombinedText)).ToList();
 
         _logger?.LogDebug($"🎯 [PHASE12.2_BATCH] バッチテキスト作成完了 - テキスト数: {batchTexts.Count}");
 
