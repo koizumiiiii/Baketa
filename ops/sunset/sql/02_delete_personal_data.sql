@@ -41,40 +41,35 @@ $optional$;
 -- この撤収用SQLは実DBのFKと管理権限を確認した専用プロジェクトでのみ使用する。
 -- 確認できなければここを実行せずAuth管理画面/Admin APIのhard deleteを使い、
 -- 同じ削除後検証を実施する（soft deleteだけでは完了にならない）。
--- auth.refresh_tokens -> auth.sessions -> auth.users の順。
--- その他の管理テーブルは存在する場合（本リポジトリにDDLなし）。
--- users/sessionsへのCASCADE依存は01で必ず確認し、03で残存を確認する。
+-- 2026-11-14に本番FKを確認済み。users削除でidentities / mfa_factors /
+-- one_time_tokens / oauth_authorizations / oauth_consents / webauthn_credentials /
+-- webauthn_challenges / mfa_recovery_code_setsがCASCADE削除される。
+-- sessionsもusersからCASCADE、refresh_tokens / mfa_amr_claimsはsessionsからCASCADE。
+-- users削除でSET NULLとなるauth.scim_usersは同日の確認で0件。
+-- flow_stateにはusersへのFKがなく、user_idやOAuthプロバイダートークンが残り得るため、
+-- ユーザー削除に先立ち全件削除する。その後refresh_tokens -> sessions -> usersの順。
+DELETE FROM auth.flow_state;
 DELETE FROM auth.refresh_tokens;
 DELETE FROM auth.sessions;
 DELETE FROM auth.users;
 
--- auth.audit_log_entries / auth.flow_state / auth.identities / auth.mfa_factors /
--- auth.mfa_challenges / auth.mfa_amr_claims / auth.one_time_tokens は存在する場合。
--- 内部仕様を推測して一律DELETEしない。03の残存件数と実FKを照合し、
+-- その他のauth内部テーブルは03で残存を確認し、個人データがあれば
 -- 管理機能で消去するか、期限内にプロジェクトを削除する。
+-- auth.schema_migrations / storage.migrationsはスキーマ管理用で個人データではなく削除しない。
 -- StorageはSQLでmetadataだけ削除しない。先にStorage管理機能で実体を削除。
 -- latest_consent_statusは通常VIEWで、consent_records削除が反映される。
 -- 未知のテーブルやmaterialized viewがあれば別途削除/更新が必要。
--- 行の内容・メール・ID・IP・トークンは出力しない。SQL Editor の Messages/NOTICE を確認。
+-- 行の内容・メール・ID・IP・トークンは出力しない。SQL Editor の結果表で件数を確認。
 -- auth/storage の追加テーブルは本番版依存。全件数を調べ、残存を見落とさない。
-DO $counts$
-DECLARE
-    r record;
-    n bigint;
-BEGIN
-    FOR r IN
-        SELECT ns.nspname AS schema_name, c.relname AS table_name
-        FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
-        WHERE ns.nspname IN ('public', 'auth', 'storage')
-          AND c.relkind IN ('r', 'p', 'm')
-          AND NOT c.relispartition
-        ORDER BY ns.nspname, c.relname
-    LOOP
-        EXECUTE format('SELECT count(*) FROM %I.%I', r.schema_name, r.table_name) INTO n;
-        RAISE NOTICE '%.%: % rows', r.schema_name, r.table_name, n;
-    END LOOP;
-END
-$counts$;
+SELECT ns.nspname AS schema_name, c.relname AS table_name,
+       (xpath('/row/c/text()', query_to_xml(
+           format('SELECT count(*) AS c FROM %I.%I', ns.nspname, c.relname),
+           false, true, '')))[1]::text::bigint AS rows
+FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+WHERE ns.nspname IN ('public', 'auth', 'storage')
+  AND c.relkind IN ('r', 'p', 'm')
+  AND NOT c.relispartition
+ORDER BY 1, 2;
 
--- 初回は変更を破棄する。上のNOTICEが0でも、ROLLBACK後は元の件数に戻る。
+-- 初回は変更を破棄する。上の結果表の件数が0でも、ROLLBACK後は元の件数に戻る。
 ROLLBACK;
