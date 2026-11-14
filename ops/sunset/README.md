@@ -197,9 +197,9 @@ listの出力にもユーザー識別子が含まれ得るため、所有者の�
 | Cloudflare旧Worker | `API_KEY / ANALYTICS_API_KEY / JWT_SECRET / SUPABASE_SERVICE_KEY` と上記プロバイダー/Patreon/Discordの全Secrets削除（Relay Env、wrangler.toml） | 旧デプロイ/他環境/共有Secretsも確認。不可逆 |
 | Supabase Edge Functions / Resend | `RESEND_API_KEY / SEND_EMAIL_HOOK_SECRET`（send-auth-email/index.ts）を失効、送信ドメイン連携終了 | Hook停止後に削除。受信MXと混同しない。不可逆 |
 | Discord Webhook | `DISCORD_WEBHOOK_URL`（crash-report.ts）を削除 | 過去投稿は別途消去。URLを記録しない。不可逆 |
-| GitHub repository/environment/organization Secrets | `SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY`（supabase-keepalive.yml）を削除。`GEMINI_API_KEY_GITHUB_ACTIONS`（gemini-cli.ymlのコメント）の登録があれば削除 | 他repo共有の組織Secretは対象紐付け解除/専用化を先に判断。不可逆 |
-| GitHub release署名 | `NETSPARKLE_ED25519_PRIVATE_KEY`（release.yml）は**残すか判断が必要**。将来の再署名が必要なら安全な保管を維持、完全終了なら所有者判断で削除 | 既存署名/公開鍵/appcastは残す。秘密鍵削除後の再署名は不可。値の表示・書き出し不要 |
-| GitHubその他 | 実在するCloudflare deploy用・PAT・追加CI用Secretを名前/用途で棚卸し（存在は要確認） | 専用PAT等は発行元でも失効。`GITHUB_TOKEN` は自動発行なので手動Secret削除対象ではない |
+| GitHub repository/environment/organization Secrets | 2026-11-14時点のGitHub Actions Secretsは `CLAUDE_API_KEY`、`GEMINI_API_KEY_GITHUB_ACTIONS`、`SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_URL` の4つ。`SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY`（supabase-keepalive.yml）と `GEMINI_API_KEY_GITHUB_ACTIONS`（gemini-cli.ymlのコメント）を削除。`CLAUDE_API_KEY` は下記 | 他repo共有の組織Secretは対象紐付け解除/専用化を先に判断。不可逆 |
+| GitHub release署名 | `NETSPARKLE_ED25519_PRIVATE_KEY` は2026-11-14に所有者が**削除済み**。乗っ取り時に旧版の自動更新へ偽の署名付き更新を配れないようにするため | v1.0.0の署名・appcastは公開済みで有効。既存署名/公開鍵/appcastは残す。`release.yml` は秘密鍵未設定でもAppCast生成をスキップして `exit 0` し、`fail_on_unmatched_files: false` のためappcast.json欠落では公開に失敗しない。他の処理が成功すると、正式版タグpushでappcast.jsonなしの新Releaseが公開されlatestが置き換わり、`releases/latest/download/appcast.json` が404となって旧版の自動更新が止まり、サイトの最新版リンクも新Releaseを指す。プレリリースではlatestを更新しない。`alpha-release.yml` は署名・AppCast生成処理を持たず、タグpushまたは手動実行でZIPのみのプレリリースを公開する（`prerelease: true`、`make_latest: false`）。秘密鍵削除だけでは新Releaseの公開を防げないため、最終版を維持するよう下記Actions方針どおり両リリース系workflowを無効化する |
+| GitHubその他 | `CLAUDE_API_KEY` は現行workflowから参照されていない（過去のClaude Security Review workflow用、コミット `b82c5077`）。未使用のため発行元（Anthropic Console）で失効してからSecretを削除。Cloudflare deploy用・PAT・追加CI用Secretも名前/用途で棚卸し（存在は要確認） | 専用PAT等は発行元でも失効。`GITHUB_TOKEN` は自動発行なので手動Secret削除対象ではない |
 
 `SUPABASE_URL`、クライアントID、モデル名、ALLOWED_ORIGINS等は秘密値とは限らないが不要な設定として整理する。
 バックアップや過去Actionsログ/Artifactsに個人データや資格情報が含まれる場合は消去し、資格情報は失効する。
