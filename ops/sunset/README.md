@@ -39,20 +39,21 @@
 | keepalive | `docs/database/keepalive.sql` | 非個人の運用カウンター。RPCからの再書き込みも止める |
 | welcome_bonus_config | `docs/database/migrations/332_welcome_bonus.sql` | 非個人の設定、適用状況要確認 |
 | latest_consent_status | `docs/database/consent_records.sql` | VIEW。親テーブル削除後に0件確認 |
-| auth.users / sessions / refresh_tokens | スキーマ文書のAuth節 | 内部DDLはリポジトリにない。実FK・権限を先に確認 |
+| auth.users / sessions / refresh_tokens / flow_state | スキーマ文書のAuth節・2026-11-14の本番確認 | 実FKは2026-11-14に本番で確認済み。flow_stateはusersへのFKがなく別途全件削除。実行権限は要確認 |
 | その他のauth内部・Storage・追加スキーマ | リポジトリでは存在・構造未確認 | 存在する場合は棚卸し対象。残存を無視しない |
 
-スキーマ文書の概要表とマイグレーションではFK説明が異なる箇所がある。
-`01_inventory.sql` で実DBの制約を確認してから実行する。未知のテーブルへ自動CASCADE/TRUNCATEしない。
+スキーマ文書の概要表とマイグレーションではFK説明が異なる箇所があるが、実FKは2026-11-14に本番で確認済み。
+`01_inventory.sql` で実DBの制約を再確認してから実行する。未知のテーブルへ自動CASCADE/TRUNCATEしない。
 
 ## 事前（11/29より前）
 
 1. [ ] **DNS管理画面 / Cloudflare / Supabase** — 全DNSレコードとWorker route/custom domain/previewを棚卸しする。
+   [公開DNS棚卸し（2026-11-14）と撤収時の扱い](dns-inventory.md)を参照。
    上のapi/auth/mailに加えapex・MX・TXT・CAA・DKIM・ワイルドカード・wwwを用途と所有先で分類する。
    **確認:** 既存の受信MXとprivacy宛転送先、Pagesの公開元を特定。秘密値を記録しない。
    **復旧:** 棚卸しは読み取りのみ。DNS削除は再設定できるが伝播待ちがある。
 2. [ ] **Supabase SQL Editor** — 管理者で `sql/01_inventory.sql` を実行する。
-   **確認:** Messages/NOTICEの全期間件数、期待テーブルの存在、実FK、トリガー、追加スキーマを照合。
+   **確認:** 各SELECTを選択して個別に実行し、結果表の全期間件数、期待テーブルの存在、実FK、トリガー、追加スキーマを照合。
    auth.users件数・利用イベント総数・クラッシュ報告総数など、個人を特定しない集計値だけを先に取得する。
    属性別・日別の小集団、メール、ID、IP、ログ本文は保存・公開しない。
    **復旧:** 読み取り専用。集計公開は所有者が別途判断する。
@@ -139,10 +140,10 @@ Observabilityは設定で無効。ダッシュボードのWorkers Logs・tail・
 3. [ ] **Supabase SQL Editor** — 流入停止を再確認し、01で本番FK・削除トリガー・全テーブルを再確認。
    `02_delete_personal_data.sql` を全体実行し、最後のROLLBACKで戻ったことを01で確認する。
    未確認FK・追加テーブル・権限エラーがあれば停止して解決し、エラーを無視して進めない。
-   **確認:** SQL内NOTICEはトランザクション中の件数。ROLLBACK後の完了証拠にはならない。
+   **確認:** 最後の結果表はトランザクション中の削除後件数。ROLLBACK後の完了証拠にはならない。
    **復旧:** 通常のDB変更はROLLBACKで戻る。外部通知トリガー等の副作用は戻らないので先に無効化する。
 4. [ ] **Supabase SQL Editor / Auth管理画面** — 02末尾のROLLBACKのみCOMMITへ変更して全体を再実行。
-   順序は利用履歴/クラッシュ/ライセンス/同意/トークン → コード/プロフィール → Auth refresh_tokens/sessions/users。
+   順序は利用履歴/クラッシュ/ライセンス/同意/トークン → コード/プロフィール → Auth flow_state/refresh_tokens/sessions/users。
    Auth内部の直接削除は文書で非推奨のため、実FK・権限が確認できなければAuth部分を外し、管理画面/Admin APIのhard deleteを用いる。
    **確認:** 別セッションの `03_verify.sql` で全対象0件、Auth管理画面でもユーザー0。時間を置いて再確認。
    **復旧:** COMMITまたはhard delete後は不可逆。バックアップから個人データを戻さない。

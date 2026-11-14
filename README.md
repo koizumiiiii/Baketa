@@ -1,44 +1,75 @@
 # Baketa
 
-[![CI Build and Test](https://github.com/koizumiiiii/Baketa/actions/workflows/ci.yml/badge.svg)](https://github.com/koizumiiiii/Baketa/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/koizumiiiii/Baketa/actions/workflows/codeql.yml/badge.svg)](https://github.com/koizumiiiii/Baketa/actions/workflows/codeql.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/koizumiiiii/Baketa)](https://github.com/koizumiiiii/Baketa/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![.NET 8](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
+**開発は終了しました。2026-11-14 公開の v1.0.0 が最終版です。今後の保守・サポートは行いません。**
 
-**Baketa（バケタ）** は、ゲーム画面のテキストをリアルタイムで翻訳し、透過オーバーレイとして表示するWindows専用アプリケーションです。
+[公式サイト](https://baketa.app) · [最終版 v1.0.0](https://github.com/koizumiiiii/Baketa/releases/tag/v1.0.0) · [Releases・モデル配布](https://github.com/koizumiiiii/Baketa/releases)
 
-## 主要機能
+Baketa is a Windows game translation overlay built with C#, Avalonia, C++/WinRT and Python.
+Development ended with v1.0.0 on November 14, 2026; no maintenance or support is provided.
+The final release uses local NLLB translation or your own Google API key, without a Baketa account or backend.
+This repository remains as a development portfolio.
 
-| カテゴリ | 機能 |
-|---------|------|
-| **OCR** | Surya OCR (Detection + Recognition)、Windows Graphics Capture API |
-| **翻訳** | 標準翻訳 (NLLB-200ローカル)、EX翻訳 (高精度クラウド)、gRPC通信 |
-| **ROI Manager** | ゲーム別テキスト位置調整、動的閾値制御、部分OCR最適化 |
-| **統合AIサーバー** | OCR+翻訳を単一プロセスで実行、VRAM 50%削減 |
-| **UI** | Avalonia + ReactiveUI、透過オーバーレイ、ダーク/ライトテーマ |
-| **認証** | Supabase Auth (OAuth対応)、Patreon連携 |
+ゲーム画面の文字を読み取り、翻訳を透過オーバーレイで表示するWindows専用アプリです。
+画面キャプチャ、変化検知、OCR、翻訳、描画をつなぐ実装と、その設計・運用の記録を残しています。
 
-### ROI Manager（自動調整機能）
+## デモ
 
-ゲーム画面のテキスト出現位置を**自動調整**し、OCR処理を最適化する目玉機能です。
+![ゲーム画面への翻訳オーバーレイのデモ](docs/pages/assets/demo/demo-en1.webp)
 
+[英語デモ動画](docs/pages/assets/demo/demo-en.mp4) · [日本語デモ動画](docs/pages/assets/demo/demo-ja.mp4)
+
+## 最終版の動作
+
+| 翻訳方法 | 処理と送信内容 |
+|---|---|
+| ローカル NLLB-200 | Surya OCRで認識し、C# ONNX Runtimeで翻訳。翻訳APIの利用料なし |
+| Gemini（BYOK） | 利用者自身のAPIキーでGoogleに画像を送信 |
+| Google Cloud Translation（BYOK） | 利用者自身のAPIキーでGoogleにOCRテキストを送信 |
+
+ログイン・課金・Baketaのサーバーは不要です。初回のコンポーネント取得と、利用者が選択したGoogle APIへの通信を行います。アプリの自動更新確認は行いません。Google APIの利用条件・料金は利用者の契約に従います。
+
+## 構成と処理の流れ
+
+Coreに抽象・イベントを置き、Applicationが処理を調整し、InfrastructureとWindows専用Platform層が実装を提供します。UIはAvalonia / ReactiveUIです。下図の矢印は処理・呼び出しの流れで、プロジェクトの参照依存を表すものではありません。
+
+```mermaid
+flowchart TD
+    UI["C# / Avalonia UI"] --> App["Application: 処理の調整"]
+    App --> Infra["Infrastructure / Platform"]
+    Infra --> Capture["C++/WinRT DLL: Windows Graphics Capture"]
+    Capture --> Change["変化検知 / ROI / OpenCV"]
+    Change --> OCR["Python gRPC サーバー: Surya OCR"]
+    OCR --> Local["C# ONNX Runtime: NLLB-200 INT8"]
+    OCR --> Google["BYOK: Google Cloud Translation / テキスト送信"]
+    Change --> Gemini["BYOK: Gemini / 画像送信"]
+    Local --> Overlay["Avalonia: 翻訳オーバーレイ"]
+    Google --> Overlay
+    Gemini --> Overlay
 ```
-調整前: 全画面OCR (~6秒)  →  調整後: 変化領域のみOCR (<1秒)
-```
 
-- **ヒートマップ最適化**: 16x16グリッドでテキスト頻出位置を記録
-- **動的閾値制御**: 頻出領域は厳格に、背景領域は緩和して検出
-- **ゲーム別プロファイル**: 実行ファイルごとに調整データを自動保存
-- **部分OCR実行**: 変化した領域のみを処理し、処理時間を大幅短縮
+翻訳はPR #451でC#の直接推論へ移行しました。[OnnxTranslationEngine](Baketa.Infrastructure/Translation/Onnx/OnnxTranslationEngine.cs)がONNXセッションを管理し、Python側は[OCR専用サーバー](grpc_server/BaketaUnifiedServer.spec)として構成しています。
 
-## クイックスタート
+## 設計判断と技術的な工夫
 
-### エンドユーザー向け
+- **変化した領域に処理を絞る:** [ROI Manager設計](docs/3-architecture/roi-system/roi-manager.md)に基づき、テキスト出現位置の学習とゲーム別プロファイルを使います。[変化検知の実装](Baketa.Infrastructure/Imaging/ChangeDetection/EnhancedImageChangeDetectionService.cs)で不要なOCR処理を抑える構成です。
+- **翻訳をC#プロセスで完結させる:** [ONNXエンジン](Baketa.Infrastructure/Translation/Onnx/OnnxTranslationEngine.cs)はCPU実行、INT8モデル、decoderのKVキャッシュを使用します。推論をロックで直列化し、セッションとキャッシュの扱いをエンジン内に集約しています。
+- **外部送信の選択を明確にする:** [Geminiの画像送信](Baketa.Infrastructure/Translation/Cloud/GeminiImageTranslator.cs)と[Googleのテキスト送信](Baketa.Infrastructure/Translation/Cloud/GoogleTranslationEngine.cs)を分離し、ローカル翻訳も選べます。
+- **言語ごとの実行環境を分離する:** WindowsキャプチャはC++/WinRT、UIと翻訳はC#、Surya OCRはPythonとし、OCRサーバーをPyInstallerで配布します。
 
-1. [最新リリース](https://github.com/koizumiiiii/Baketa/releases/latest)からZIPをダウンロード
-2. 任意のフォルダに展開
-3. `Baketa.exe` を実行
+最終版の同一条件で再現できる性能比較を確認できないため、速度倍率・VRAM削減率は掲載していません。
+過去にはCloudflare WorkersのRelay Server、Supabase Auth、Patreon連携による認証・課金基盤を構築・運用していました。[旧構成の記録](docs/3-architecture/external-services.md)と[撤収手順](ops/sunset/README.md)は履歴資料です。
+
+## 制約・既知の限界
+
+- Windows x64専用です。ネイティブキャプチャDLLとWindows用ランタイムを使用します。
+- CUDA版OCRは対応するNVIDIA GPUとドライバーが必要です。CPU版も用意していますが、速度や必要メモリは画像・モデル・環境に依存します。NLLB翻訳はCPUで実行します。
+- OCRの読み取り誤りや翻訳の誤訳があり、ゲームのフォント・背景・画面変化によって結果が変わります。
+- NLLB-200のモデルはCC-BY-NC-4.0（非商用）です。Suryaのコードとモデル重みも別ライセンスです。本体のMITライセンスだけで全コンポーネントを扱うことはできません。[第三者ライセンス一覧](THIRD-PARTY-NOTICES.md)を参照してください。
+- 保守終了後のOS・ドライバー・外部API変更への追従はありません。
+
+## 利用・再現手順
+
+[最終版](https://github.com/koizumiiiii/Baketa/releases/tag/v1.0.0)のZIPを展開して `Baketa.exe` を実行します。初回はOCRサーバー・翻訳モデルなどを取得します。
 
 ### コンポーネントを手動配置する場合
 
@@ -75,126 +106,37 @@ Surya のモデル重みは初回 OCR 時に `https://models.datalab.to` から�
 
 ### 開発者向け
 
-```bash
-# クローン
-git clone https://github.com/koizumiiiii/Baketa.git
-cd Baketa
+Windows x64、.NET 8 SDK、Visual Studio 2022のC++開発環境とWindows SDK、Python 3.10を使用します。[CLAUDE.md](CLAUDE.md)のビルド手順に従い、ネイティブDLL、PyInstallerによるOCRサーバー、.NETソリューションの順にビルドします。`grpc_server/dist/BaketaUnifiedServer/BaketaUnifiedServer.exe` が存在すると、`Baketa.UI/Baketa.UI.csproj` の `CopyUnifiedServer` ターゲットが.NETビルド後にサーバーを出力先へ自動コピーします。
 
-# ビルド
-dotnet build
+```powershell
+# Visual Studio Developer PowerShellで、リポジトリ直下から実行
+msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64
 
-# テスト実行
+# CPU版OCRサーバーの環境（CUDA版とは別に作成）
+Set-Location grpc_server
+py -3.10 -m venv venv_build
+.\venv_build\Scripts\pip.exe install -r requirements-lock-cpu.txt
+.\venv_build\Scripts\pyinstaller.exe BaketaUnifiedServer.spec
+Set-Location ..
+
+# .NETビルド後にOCRサーバーを出力先へ自動コピー
+dotnet build --configuration Debug --arch x64
+
 dotnet test
-
-# アプリ起動
-dotnet run --project Baketa.UI
+dotnet run --project Baketa.UI --configuration Debug
 ```
 
-**詳細な開発環境セットアップは [CLAUDE.md](CLAUDE.md) を参照してください。**
+CUDA版は `grpc_server` 内で `py -3.10 -m venv venv_build_cuda` を実行し、その環境のpipで `requirements-lock-cuda.txt` をインストールし、同環境のPyInstallerで同じspecをビルドします。モデル配置は上記手順を参照してください。
 
-## アーキテクチャ
+[CPUロック](grpc_server/requirements-lock-cpu.txt)・[CUDAロック](grpc_server/requirements-lock-cuda.txt)はビルド環境のスナップショットです。公開済みバイナリのビルド時点と完全一致する保証はありません。Pythonやprotoを変更した場合は、PyInstallerでサーバーを再ビルドしてから `dotnet build --configuration Debug --arch x64` を実行し、出力先へ自動コピーします。
 
-5層クリーンアーキテクチャを採用：
+## 資料とコントリビューション
 
-```
-Baketa.UI (Avalonia)
-    ↓
-Baketa.Application (ビジネスロジック)
-    ↓
-Baketa.Infrastructure / Baketa.Infrastructure.Platform
-    ↓
-Baketa.Core (抽象化・イベント)
-```
+[ドキュメント一覧](docs/README.md)には開発中・旧サービス時代の資料も含まれます。現行動作は最終版のコードと本READMEを参照してください。
+開発終了につき、機能追加・修正のコントリビューションやサポート依頼は受け付けません。
 
-### OCR処理フロー
+## ライセンス・謝辞
 
-```mermaid
-graph LR
-    Capture[Windows Graphics Capture] --> Filter[OpenCV Filters]
-    Filter --> OCR[Surya OCR Server]
-    OCR --> Det[Detection]
-    OCR --> Rec[Recognition]
-    Rec --> Chunks[Text Chunks]
-```
+Baketa本体は[MIT License](LICENSE)です。同梱・初回取得するライブラリとモデルには別の条件が適用されます。[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)に採用バージョン、確認根拠、未確認事項を記載しています。
 
-- **キャプチャ**: Windows Graphics Capture API (C++/WinRT)
-- **前処理**: OpenCV モルフォロジー・ガウシアンフィルタ
-- **OCR**: Surya OCR (gRPC、GPU/CUDA対応)
-
-### gRPC翻訳システム
-
-```mermaid
-graph LR
-    UI[Baketa.UI] --> App[Application]
-    App --> Adapter[GrpcTranslationEngineAdapter]
-    Adapter --> Client[GrpcTranslationClient]
-    Client -->|HTTP/2| Server[Python gRPC Server]
-    Server --> NLLB[NLLB-200]
-```
-
-- **プロトコル**: HTTP/2 (gRPC)、ポート 50051
-- **モデル**: NLLB-200-distilled-600M (CTranslate2 int8量子化、~1GB)
-- **最適化**: CTranslate2 + int8量子化 (メモリ80%削減)
-
-## システム要件
-
-| 項目 | 最低要件 | 推奨要件 |
-|------|----------|----------|
-| **OS** | Windows 10 (64-bit) | Windows 11 (64-bit) |
-| **CPU** | 4コア以上 | 6コア以上 |
-| **RAM** | 8GB | 16GB以上 |
-| **GPU VRAM** | 4GB | 6GB以上 |
-| **ストレージ** | 10GB | 20GB以上 |
-
-> **Note**: CUDA対応GPU（NVIDIA GeForce GTX 1060以上）があると、OCR処理が約59倍高速化されます。
-> 起動時にハードウェアチェックが実行され、要件を満たさない場合は警告が表示されます。
-
-## プロジェクト構成
-
-```
-Baketa/
-├── Baketa.Core/                 # コア機能・抽象化
-├── Baketa.Infrastructure/       # OCR・翻訳エンジン
-├── Baketa.Infrastructure.Platform/ # Windows専用実装
-├── Baketa.Application/          # ビジネスロジック
-├── Baketa.UI/                   # Avalonia UI
-├── BaketaCaptureNative/         # C++/WinRT ネイティブDLL
-├── grpc_server/                 # Python翻訳サーバー
-├── tests/                       # テスト (2,100+ケース)
-└── docs/                        # ドキュメント
-```
-
-## ドキュメント
-
-- **[docs/README.md](docs/README.md)** - ドキュメントインデックス
-- **[CLAUDE.md](CLAUDE.md)** - 開発ガイド・コーディング規約
-
-## コントリビューション
-
-1. [Issues](https://github.com/koizumiiiii/Baketa/issues)で課題を確認
-2. リポジトリをフォーク
-3. クリーンアーキテクチャとコーディング規約に従って実装
-4. テストを追加・実行
-5. プルリクエストを作成
-
-### コーディング規約
-
-- C# 12 最新機能を活用
-- クリーンアーキテクチャの依存関係を厳守
-- 新機能にはテストコードを必須で追加
-- `ConfigureAwait(false)` をライブラリコードで使用
-
-## ライセンス
-
-[MIT License](LICENSE)
-
-## 謝辞
-
-- [Surya OCR](https://github.com/VikParuchuri/surya) - テキスト検出・認識
-- [Meta NLLB-200](https://github.com/facebookresearch/fairseq/tree/nllb) - 多言語翻訳
-- [Avalonia](https://avaloniaui.net/) - UIフレームワーク
-- [OpenCV](https://opencv.org/) - 画像処理
-
----
-
-**Baketa** - ゲーム翻訳をもっと身近に
+[Surya OCR](https://github.com/VikParuchuri/surya)、[Meta NLLB-200](https://huggingface.co/facebook/nllb-200-distilled-600M)、[Avalonia](https://avaloniaui.net/)、[OpenCV](https://opencv.org/)と各依存プロジェクトに感謝します。
