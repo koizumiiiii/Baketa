@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="meta_title">プライバシーポリシー - Baketa</title>
-    <meta name="description" content="Baketaのプライバシーポリシーです。個人情報の取り扱いについてご確認ください。">
+    <meta name="description" content="Baketaの開発は終了しました。v1.0.0を最終版として公開しました。今後のアップデート・保守・サポートは行いません。ソースコードはGitHubで公開を続けます。">
     <link rel="canonical" href="https://baketa.app/pages/privacy-policy.html">
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="page">
+<body class="page page--legal">
     <header class="header">
         <div class="container">
             <div class="header__inner">
@@ -24,219 +24,49 @@
         <div class="container container--sm">
             <div class="card">
                 <h1 class="page-title" data-i18n="page_title">プライバシーポリシー</h1>
-                <p class="lead" data-i18n="lead">Baketa（以下「本サービス」）は、ユーザーの個人情報保護を重要視しています。本プライバシーポリシーは、本サービスがどのような情報を収集し、どのように使用・保護するかを説明します。</p>
-
-                <h2 class="section-title" data-i18n="section1_title">1. 収集する情報</h2>
-
-                <h3 class="subsection-title" data-i18n="section1_1_title">1.1 アカウント情報</h3>
-                <p data-i18n="section1_1_text">本サービスの利用登録時に、以下の情報を収集します：</p>
-                <ul>
-                    <li data-i18n="section1_1_list1">メールアドレス</li>
-                    <li data-i18n="section1_1_list2">パスワード（暗号化して保存）</li>
-                </ul>
-
-                <h3 class="subsection-title" data-i18n="section1_2_title">1.2 利用情報</h3>
-                <p data-i18n="section1_2_text">本サービスの利用に伴い、以下の情報を自動的に収集する場合があります：</p>
-                <ul>
-                    <li data-i18n="section1_2_list1">アプリケーションの使用状況（機能の利用頻度など）</li>
-                    <li data-i18n="section1_2_list2">エラーログおよびクラッシュレポート</li>
-                    <li data-i18n="section1_2_list3">デバイス情報（OS、アプリバージョンなど）</li>
-                </ul>
-
-                <h3 class="subsection-title" data-i18n="section1_3_title">1.3 翻訳データ（画面キャプチャ）</h3>
-                <p data-i18n="section1_3_text">本サービスはゲーム画面のキャプチャ（スクリーンショット）を取得し、OCR（光学文字認識）でテキストを抽出して翻訳を行います。</p>
-                <div class="callout callout--success">
-                    <p data-i18n="callout_standard"><strong>標準翻訳（通常モード）：</strong>翻訳品質向上のため、OCRで抽出されたテキストが外部翻訳サービス（DeepL、Google Translation）に送信される場合があります。これらのサービスが利用できない場合は、ローカル翻訳エンジン（NLLB-200）によりお客様のデバイス上でのみ処理されます。送信されるのはテキストデータのみであり、画面キャプチャ画像は送信されません。各サービスのプライバシーポリシーも併せてご確認ください。</p>
-                </div>
-                <div class="callout callout--info">
-                    <p data-i18n="callout_cloud"><strong>クラウドAI翻訳（オプション）：</strong>クラウド翻訳機能を選択した場合、抽出されたテキストはAI（人工知能）による自動翻訳処理のために外部サービス（Google Gemini、OpenAI等）に送信されます。<strong>これらの翻訳結果はAIによって自動生成されたものです。</strong>送信されたデータは翻訳処理にのみ使用され、当社のサーバーには保存されません。各サービスのプライバシーポリシーも併せてご確認ください。</p>
-                </div>
-                <div class="callout callout--warning">
-                    <p data-i18n="callout_euai"><strong>EU AI Act対応：</strong>本サービスの翻訳機能（クラウド翻訳およびローカルNLLB-200）はAI技術を使用しています。翻訳結果はAIによる自動処理の結果であり、完全な正確性を保証するものではありません。</p>
-                </div>
-
-                <h2 class="section-title" data-i18n="section2_title">2. 情報の利用目的</h2>
-                <p data-i18n="section2_text">収集した情報は、以下の目的で利用します：</p>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th data-i18n="table2_header_purpose">目的</th>
-                                <th data-i18n="table2_header_detail">詳細</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td data-i18n="table2_row1_purpose">サービス提供</td>
-                                <td data-i18n="table2_row1_detail">ユーザー認証、アカウント管理</td>
-                            </tr>
-                            <tr>
-                                <td data-i18n="table2_row2_purpose">サービス改善</td>
-                                <td data-i18n="table2_row2_detail">機能の改善、バグ修正</td>
-                            </tr>
-                            <tr>
-                                <td data-i18n="table2_row3_purpose">カスタマーサポート</td>
-                                <td data-i18n="table2_row3_detail">お問い合わせへの対応</td>
-                            </tr>
-                            <tr>
-                                <td data-i18n="table2_row4_purpose">お知らせ</td>
-                                <td data-i18n="table2_row4_detail">重要な更新やセキュリティ情報の通知</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <h2 class="section-title" data-i18n="section3_title">3. 情報の共有</h2>
-                <p data-i18n="section3_text">当社は、以下の場合を除き、ユーザーの個人情報を第三者と共有することはありません：</p>
-                <ul>
-                    <li data-i18n="section3_list1">ユーザーの同意がある場合</li>
-                    <li data-i18n="section3_list2">法令に基づく開示請求があった場合</li>
-                    <li data-i18n="section3_list3">サービス提供に必要な業務委託先への提供（適切な契約のもと）</li>
-                    <li data-i18n="section3_list4">合併、会社分割、事業譲渡等の場合</li>
-                </ul>
-                <div class="callout callout--success">
-                    <p data-i18n="callout_ccpa"><strong>CCPA対応（カリフォルニア州消費者プライバシー法）：</strong>当社はユーザーの個人情報を第三者に<strong>販売しません</strong>。また、ターゲティング広告やクロスコンテキスト行動広告の目的で個人情報を共有することもありません。</p>
-                </div>
-
-                <h2 class="section-title" data-i18n="section4_title">4. データの保護</h2>
-                <p data-i18n="section4_text">当社は、ユーザーの情報を保護するために以下の措置を講じています：</p>
-                <ul>
-                    <li data-i18n="section4_list1">SSL/TLS暗号化による通信の保護</li>
-                    <li data-i18n="section4_list2">パスワードのハッシュ化保存</li>
-                    <li data-i18n="section4_list3">アクセス制御による不正アクセスの防止</li>
-                    <li data-i18n="section4_list4">定期的なセキュリティ監査</li>
-                </ul>
-
-                <h2 class="section-title" data-i18n="section5_title">5. Cookieの使用</h2>
-                <p data-i18n="section5_text">本サービスのWebサイトでは、以下の目的でCookieを使用する場合があります：</p>
-                <ul>
-                    <li data-i18n="section5_list1">セッション管理</li>
-                    <li data-i18n="section5_list2">ユーザー設定の保存</li>
-                    <li data-i18n="section5_list3">アクセス解析</li>
-                </ul>
-                <p data-i18n="section5_note">ブラウザの設定によりCookieを無効にすることができますが、一部の機能が制限される場合があります。</p>
-
+                <p class="lead" data-i18n="lead">Baketaの開発は終了しました。v1.0.0を最終版として公開しました。今後のアップデート・保守・サポートは行いません。ソースコードはGitHubで公開を続けます。</p>
+                
+                <h2 class="section-title" data-i18n="final_title">1. 最終版について</h2>
+                <p data-i18n="final_text">最終版では、ログイン・アカウント・有料プラン（Patreon）・プロモーションコード・Baketa提供のCloud AI翻訳を廃止します。</p>
+                
+                <h2 class="section-title" data-i18n="local_title">2. ローカル処理</h2>
+                <p data-i18n="local_text">OCRとローカルNLLB-200翻訳はPC内で処理され、初回セットアップ後はオフラインで利用できます。最終版はBaketaのサーバー（Relay Server / Supabase）と通信せず、使用統計やクラッシュレポートも送信しません。最終版アプリの利用によりBaketaの運営者が取得・保存するデータはありません。</p>
+                
+                <h2 class="section-title" data-i18n="google_title">3. Google APIの利用</h2>
+                <p data-i18n="google_text">自分のAPIキーでGeminiを選択すると、画面のキャプチャ画像をGoogleへ直接送信します。Google Cloud Translationでは、OCRで抽出したテキストをGoogleへ直接送信します。Googleの規約・プライバシーポリシーが適用されます。Gemini APIの無料枠では、Googleが送信データを製品改善に利用する場合があります。機密情報を送信する前にGoogleの条件をご確認ください。翻訳は自動生成され、正確性は保証されません。 <a href="https://ai.google.dev/gemini-api/terms">Gemini API</a> · <a href="https://cloud.google.com/terms">Google Cloud Translation</a> · <a href="https://policies.google.com/privacy">Googleのプライバシーポリシー</a></p>
+                
+                <h2 class="section-title" data-i18n="keys_title">4. APIキーの保存</h2>
+                <p data-i18n="keys_text">APIキーはWindows DPAPIで暗号化してPC内に保存します。API利用時にGoogleへ送信しますが、Baketaの運営者には送信しません。APIキーの管理は利用者の責任で行ってください。</p>
+                
+                <h2 class="section-title" data-i18n="downloads_title">5. コンポーネントの取得</h2>
+                <p data-i18n="downloads_text">初回のコンポーネント取得にはインターネット接続が必要です。GitHub Releases、HuggingFaceのtokenizer、models.datalab.toのSurya OCRモデルを取得します。取得先にはダウンロード要求が届き、各提供者のポリシーが適用されます。セットアップ後のアプリの外部通信は、利用者が選択した場合のGoogle APIに限られます。</p>
+                
                 <h2 class="section-title" data-i18n="section6_title">6. ユーザーの権利</h2>
-                <p data-i18n="section6_text">ユーザーは、自身の個人情報について以下の権利を有します：</p>
+                <p data-i18n="section6_intro">ユーザーは、自身の個人情報について以下の権利を有します：</p>
                 <ul>
-                    <li data-i18n="section6_list1"><strong>アクセス権</strong>：保有する個人情報の開示を請求できます</li>
-                    <li data-i18n="section6_list2"><strong>訂正権</strong>：不正確な情報の訂正を請求できます</li>
-                    <li data-i18n="section6_list3"><strong>削除権</strong>：アカウントおよび関連データの削除を請求できます</li>
-                    <li data-i18n="section6_list4"><strong>データポータビリティ</strong>：一定の条件下でデータの提供を請求できます</li>
+                <li data-i18n="section6_list1"><strong>アクセス権</strong>：保有する個人情報の開示を請求できます</li>
+                <li data-i18n="section6_list2"><strong>訂正権</strong>：不正確な情報の訂正を請求できます</li>
+                <li data-i18n="section6_list3"><strong>削除権</strong>：アカウントおよび関連データの削除を請求できます</li>
+                <li data-i18n="section6_list4"><strong>データポータビリティ</strong>：一定の条件下でデータの提供を請求できます</li>
                 </ul>
                 <p data-i18n="section6_note">これらの権利を行使する場合は、下記のお問い合わせ先までご連絡ください。</p>
-
+                <p data-i18n="callout_ccpa"><strong>CCPA対応（カリフォルニア州消費者プライバシー法）：</strong>当社はユーザーの個人情報を第三者に<strong>販売しません</strong>。また、ターゲティング広告やクロスコンテキスト行動広告の目的で個人情報を共有することもありません。</p>
+                
                 <h2 class="section-title" data-i18n="section7_title">7. 未成年者のプライバシー</h2>
                 <p data-i18n="section7_text">本サービスは、16歳未満の方を対象としていません。16歳未満の方が個人情報を提供されたことが判明した場合、当社は速やかにその情報を削除します。</p>
-
-                <h2 class="section-title" data-i18n="section8_title">8. 国際的なデータ転送</h2>
-                <p data-i18n="section8_text">当社は日本国内でサービスを運営していますが、サービス提供のために、個人情報が日本国外に転送される場合があります。その場合、適切な保護措置を講じます。</p>
-
-                <h2 class="section-title" data-i18n="section9_title">9. データの保持期間</h2>
-                <ul>
-                    <li data-i18n="section9_list1">アカウント情報：アカウント削除まで</li>
-                    <li data-i18n="section9_list2">利用ログ：収集から1年間</li>
-                    <li data-i18n="section9_list3">エラーログ：収集から6ヶ月間</li>
-                </ul>
-                <p data-i18n="section9_note">法令で定められた保持期間がある場合は、それに従います。</p>
-
-                <h2 class="section-title" data-i18n="section10_title">10. Patreon連携によるライセンス管理</h2>
-                <p data-i18n="section10_text">本サービスでは、有料プランの認証にPatreon（https://www.patreon.com/）を利用しています。</p>
-
-                <h3 class="subsection-title" data-i18n="section10_1_title">10.1 Patreonから取得する情報</h3>
-                <p data-i18n="section10_1_text">Patreon連携時に、以下の情報を取得します：</p>
-                <ul>
-                    <li data-i18n="section10_1_list1"><strong>Patreon ユーザーID</strong>：ライセンス認証のための一意識別子</li>
-                    <li data-i18n="section10_1_list2"><strong>メールアドレス</strong>：アカウント確認および重要な通知用</li>
-                    <li data-i18n="section10_1_list3"><strong>支援Tier情報</strong>：ご利用プラン（Pro/Premium/Ultimate）の判定</li>
-                    <li data-i18n="section10_1_list4"><strong>支援状態</strong>：有効/無効の確認</li>
-                </ul>
-
-                <h3 class="subsection-title" data-i18n="section10_2_title">10.2 認証トークンの管理</h3>
-                <div class="callout callout--info">
-                    <p data-i18n="callout_token_security"><strong>セキュリティ対策：</strong>Patreonの認証トークン（アクセストークン・リフレッシュトークン）は、お客様のデバイスには保存されません。当社が運営する中継サーバー（Cloudflare Workers）で安全に管理され、暗号化された状態で保存されます。</p>
-                </div>
-                <ul>
-                    <li data-i18n="section10_2_list1">お客様のデバイスには、当社独自のセッショントークンのみが保存されます</li>
-                    <li data-i18n="section10_2_list2">セッショントークンは暗号化され、有効期限が設定されています</li>
-                    <li data-i18n="section10_2_list3">Patreonトークンへの直接アクセスは当社サーバーからのみ行われます</li>
-                </ul>
-
-                <h3 class="subsection-title" data-i18n="section10_3_title">10.3 データの保持期間</h3>
-                <ul>
-                    <li data-i18n="section10_3_list1">Patreon認証トークン：Patreon連携解除まで（中継サーバーで保持）</li>
-                    <li data-i18n="section10_3_list2">セッショントークン：発行から7日間（デバイス上）</li>
-                    <li data-i18n="section10_3_list3">ライセンスキャッシュ：最終確認から7日間（オフライン利用のため）</li>
-                </ul>
-
-                <h3 class="subsection-title" data-i18n="section10_4_title">10.4 連携の解除</h3>
-                <p data-i18n="section10_4_text">Patreon連携はいつでも解除できます。解除すると：</p>
-                <ul>
-                    <li data-i18n="section10_4_list1">中継サーバー上のPatreonトークンは即座に削除されます</li>
-                    <li data-i18n="section10_4_list2">デバイス上のセッショントークンとキャッシュは削除されます</li>
-                    <li data-i18n="section10_4_list3">有料プランの機能は利用できなくなります</li>
-                </ul>
-                <p data-i18n="section10_4_note">Patreon側からも連携を解除できます：Patreon設定 → 接続済みアプリ → Baketa → アクセスを取り消す</p>
-
-                <h2 class="section-title" data-i18n="section11_title">11. サービス改善のための統計データ収集</h2>
-                <p data-i18n="section11_text">本サービスでは、サービス改善を目的として以下の情報を収集します。</p>
-
-                <h3 class="subsection-title" data-i18n="section11_1_title">11.1 収集する情報</h3>
-                <ul>
-                    <li data-i18n="section11_1_list1">ゲームウィンドウタイトル（翻訳対象のゲーム名）</li>
-                    <li data-i18n="section11_1_list2">翻訳言語ペア（翻訳元言語・翻訳先言語）</li>
-                    <li data-i18n="section11_1_list3">利用国（IPアドレスから推定）</li>
-                    <li data-i18n="section11_1_list4">翻訳モード（標準翻訳/EX翻訳）</li>
-                    <li data-i18n="section11_1_list5">セッション情報（利用開始時刻、翻訳回数）</li>
-                </ul>
-                <div class="callout callout--success">
-                    <p data-i18n="callout_ip"><strong>IPアドレスについて：</strong>IPアドレスは利用国の推定にのみ使用し、推定後は即座に破棄します。IPアドレス自体をサーバーに保存することはありません。</p>
-                </div>
-
-                <h3 class="subsection-title" data-i18n="section11_2_title">11.2 利用目的</h3>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th data-i18n="table11_header_purpose">目的</th>
-                                <th data-i18n="table11_header_detail">詳細</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td data-i18n="table11_row1_purpose">サービス改善</td>
-                                <td data-i18n="table11_row1_detail">人気ゲームの把握、機能改善の優先順位決定</td>
-                            </tr>
-                            <tr>
-                                <td data-i18n="table11_row2_purpose">翻訳品質向上</td>
-                                <td data-i18n="table11_row2_detail">言語ペアごとの需要把握、翻訳精度改善</td>
-                            </tr>
-                            <tr>
-                                <td data-i18n="table11_row3_purpose">マーケティング</td>
-                                <td data-i18n="table11_row3_detail">地域別の利用傾向分析</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 class="subsection-title" data-i18n="section11_3_title">11.3 データの保持期間</h3>
-                <ul>
-                    <li data-i18n="section11_3_list1">個別セッションデータ：90日間</li>
-                    <li data-i18n="section11_3_list2">日次集計データ：無期限（個人を特定できない形式）</li>
-                </ul>
-
-                <h3 class="subsection-title" data-i18n="section11_4_title">11.4 注意事項</h3>
-                <ul>
-                    <li data-i18n="section11_4_list1">収集したデータは統計目的のみに使用し、個人を特定する目的では使用しません</li>
-                    <li data-i18n="section11_4_list2">ゲームタイトル等の情報は集計・統計処理後に分析に使用されます</li>
-                </ul>
-
-                <h2 class="section-title" data-i18n="section12_title">12. プライバシーポリシーの変更</h2>
-                <p data-i18n="section12_text">当社は、必要に応じて本プライバシーポリシーを変更することがあります。重要な変更がある場合は、サービス内での通知またはメールでお知らせします。</p>
-
-                <h2 class="section-title" data-i18n="section13_title">13. お問い合わせ</h2>
-                <p data-i18n="section13_text">本プライバシーポリシーに関するご質問やご要望は、以下までお問い合わせください。</p>
-                <p>メール: <a href="mailto:privacy@baketa.app">privacy@baketa.app</a></p>
+                
+                <h2 class="section-title" data-i18n="legacy_title">8. 旧サービスのデータと削除</h2>
+                <p data-i18n="legacy_text">旧Relay Serverとアカウント機能は2026-11-29に停止予定です。その後、Supabase上のアカウント情報・利用ログ・クラッシュレポート、およびCloudflare KVのセッション情報を削除し、2026-12-13までの完了を目標とします。この削除予定は従来の保持期間に代わるものです。それ以前の削除請求はprivacy@baketa.appで受け付けます。</p>
+                <p data-i18n="migration_text">最終版の初回起動時に、旧版がPC内に保存したログイン情報・ライセンス情報を削除します。削除に失敗した場合は次回以降の起動時に再試行します。このローカル削除と、旧サーバー上のデータ削除は別の処理です。</p>
+                
+                <h2 class="section-title" data-i18n="website_title">9. ウェブサイトのアクセス解析</h2>
+                <p data-i18n="website_text">baketa.appのランディングページでは、アクセスや操作の分析にGoogle Analyticsを使用し、Cookieを使用する場合があります。これは最終版アプリとは別のウェブサイト上の処理です。ブラウザーでCookieを制限できます。Google AnalyticsにはGoogleのプライバシーポリシーが適用されます。</p>
+                
+                <h2 class="section-title" data-i18n="changes_title">10. ポリシーの変更</h2>
+                <p data-i18n="changes_text">本ポリシーの変更やサービス終了に関するお知らせは、このウェブサイトに掲載します。</p>
+                
+                <h2 class="section-title" data-i18n="contact_title">11. お問い合わせ</h2>
+                <p data-i18n="contact_text">プライバシーに関するお問い合わせ・データ削除請求は、引き続き<a href="mailto:privacy@baketa.app">privacy@baketa.app</a>で受け付けます。製品サポートは終了しています。</p>
             </div>
         </div>
     </main>
@@ -244,7 +74,7 @@
     <footer class="footer">
         <div class="container">
             <p data-i18n="footer_copyright">&copy; 2025 Baketa. All rights reserved.</p>
-            <p data-i18n="footer_updated">最終更新日: 2026年1月7日</p>
+            <p data-i18n="footer_updated">最終更新日: 2026-11-15</p>
         </div>
     </footer>
 

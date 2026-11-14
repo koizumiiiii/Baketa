@@ -208,6 +208,7 @@ a:hover { color: var(--lp-red); }
 }
 
 .lp-section-title {
+  overflow-wrap: anywhere;
   font-size: clamp(1.25rem, 3vw, 1.5rem);
   font-weight: 700;
   text-align: center;
@@ -880,6 +881,8 @@ a:hover { color: var(--lp-red); }
 }
 
 .lp-req-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: center;
   padding: 1.25rem 0.75rem;
   background: var(--lp-bg-card);
@@ -1075,3 +1078,17 @@ a:hover { color: var(--lp-red); }
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* End-of-development notice uses the existing pixel palette. */
+.lp-sunset {
+  padding: clamp(1rem, 4vw, 2rem) 1rem;
+  background: var(--lp-bg-alt);
+  border-bottom: 4px solid var(--lp-brown);
+  overflow-wrap: anywhere;
+}
+.lp-sunset h2 {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  line-height: 1.4;
+}
+.lp-sunset p { margin-top: 0.75rem; }
+.lp-sunset a { color: var(--lp-text); text-decoration: underline; }
