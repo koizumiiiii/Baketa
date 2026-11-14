@@ -8,7 +8,7 @@
     <link rel="canonical" href="https://baketa.app/pages/terms-of-service.html">
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="page">
+<body class="page page--legal">
     <header class="header">
         <div class="container">
             <div class="header__inner">
@@ -29,23 +29,17 @@
                 <h2 class="section-title" data-i18n="article1_title">第1条（適用）</h2>
                 <p data-i18n="article1_text">本規約は、ユーザーと本サービス運営者との間の本サービスの利用に関わる一切の関係に適用されるものとします。</p>
 
-                <h2 class="section-title" data-i18n="article2_title">第2条（利用登録）</h2>
+                <h2 class="section-title" data-i18n="article2_title">第2条（アカウント・有料サービスの終了）</h2>
                 <ol>
-                    <li data-i18n="article2_list1">本サービスにおいては、登録希望者が本規約に同意の上、運営者の定める方法によって利用登録を申請し、運営者がこれを承認することによって、利用登録が完了するものとします。</li>
-                    <li data-i18n="article2_list2">運営者は、利用登録の申請者に以下の事由があると判断した場合、利用登録の申請を承認しないことがあり、その理由については一切の開示義務を負わないものとします。
-                        <ul>
-                            <li data-i18n="article2_list2_sub1">利用登録の申請に際して虚偽の事項を届け出た場合</li>
-                            <li data-i18n="article2_list2_sub2">本規約に違反したことがある者からの申請である場合</li>
-                            <li data-i18n="article2_list2_sub3">その他、運営者が利用登録を相当でないと判断した場合</li>
-                        </ul>
-                    </li>
+                    <li data-i18n="article2_list1">最終版では、ログイン・アカウント・有料プラン（Patreon）・プロモーションコード・Baketa提供のCloud AI翻訳を廃止します。</li>
+                    <li data-i18n="article2_list2">旧Relay Serverとアカウント機能は2026-11-29に停止予定です。その後、Supabase上のアカウント情報・利用ログ・クラッシュレポート、およびCloudflare KVのセッション情報を削除し、2026-12-13までの完了を目標とします。この削除予定は従来の保持期間に代わるものです。それ以前の削除請求はprivacy@baketa.appで受け付けます。</li>
                 </ol>
 
-                <h2 class="section-title" data-i18n="article3_title">第3条（ユーザーIDおよびパスワードの管理）</h2>
+                <h2 class="section-title" data-i18n="article3_title">第3条（翻訳と利用者自身のAPIキー）</h2>
                 <ol>
-                    <li data-i18n="article3_list1">ユーザーは、自己の責任において、本サービスのユーザーIDおよびパスワードを適切に管理するものとします。</li>
-                    <li data-i18n="article3_list2">ユーザーは、いかなる場合にも、ユーザーIDおよびパスワードを第三者に譲渡または貸与し、もしくは第三者と共用することはできません。</li>
-                    <li data-i18n="article3_list3">ユーザーIDとパスワードの組み合わせが登録情報と一致してログインされた場合には、そのユーザーIDを登録しているユーザー自身による利用とみなします。</li>
+                    <li data-i18n="article3_list1">ローカルNLLB-200翻訳は引き続き無料です。自分のAPIキーでGeminiまたはGoogle Cloud Translationも利用できます。第三者サービスの利用は利用者の責任となり、API利用料は利用者とGoogleの契約によります。</li>
+                    <li data-i18n="article3_list2">自分のAPIキーでGeminiを選択すると、画面のキャプチャ画像をGoogleへ直接送信します。Google Cloud Translationでは、OCRで抽出したテキストをGoogleへ直接送信します。Googleの規約・プライバシーポリシーが適用されます。Gemini APIの無料枠では、Googleが送信データを製品改善に利用する場合があります。機密情報を送信する前にGoogleの条件をご確認ください。翻訳は自動生成され、正確性は保証されません。 <a href="https://ai.google.dev/gemini-api/terms">Gemini API</a> · <a href="https://cloud.google.com/terms">Google Cloud Translation</a> · <a href="https://policies.google.com/privacy">Googleのプライバシーポリシー</a></li>
+                    <li data-i18n="article3_list3">APIキーはWindows DPAPIで暗号化してPC内に保存します。API利用時にGoogleへ送信しますが、Baketaの運営者には送信しません。APIキーの管理は利用者の責任で行ってください。</li>
                 </ol>
 
                 <h2 class="section-title" data-i18n="article4_title">第4条（禁止事項）</h2>
@@ -65,7 +59,7 @@
 
                 <h2 class="section-title" data-i18n="article5_title">第5条（本サービスの提供の停止等）</h2>
                 <ol>
-                    <li data-i18n="article5_list1">運営者は、以下のいずれかの事由があると判断した場合、ユーザーに事前に通知することなく本サービスの全部または一部の提供を停止または中断することができるものとします。
+                    <li><span data-i18n="article5_list1">運営者は、以下のいずれかの事由があると判断した場合、ユーザーに事前に通知することなく本サービスの全部または一部の提供を停止または中断することができるものとします。</span>
                         <ul>
                             <li data-i18n="article5_list1_sub1">本サービスにかかるコンピュータシステムの保守点検または更新を行う場合</li>
                             <li data-i18n="article5_list1_sub2">地震、落雷、火災、停電または天災などの不可抗力により、本サービスの提供が困難となった場合</li>
@@ -89,12 +83,12 @@
                     <li data-i18n="article7_list3">翻訳結果の正確性については保証いたしません。重要な文書の翻訳には、専門の翻訳者をご利用ください。</li>
                 </ol>
 
-                <h2 class="section-title" data-i18n="article8_title">第8条（サービス内容の変更等）</h2>
-                <p data-i18n="article8_text">運営者は、ユーザーへの事前の告知をもって、本サービスの内容を変更、追加または廃止することがあり、ユーザーはこれを承諾するものとします。</p>
+                <h2 class="section-title" data-i18n="article8_title">第8条（開発終了）</h2>
+                <p data-i18n="article8_text">Baketaの開発は終了しました。v1.0.0を最終版として公開しました。今後のアップデート・保守・サポートは行いません。ソースコードはGitHubで公開を続けます。 旧版をご利用の方は<a href="https://github.com/koizumiiiii/Baketa/releases/latest">GitHub Releases</a>をご確認のうえ、最終版v1.0.0に更新してください。アプリによる自動更新確認は行いません。</p>
 
                 <h2 class="section-title" data-i18n="article9_title">第9条（利用規約の変更）</h2>
                 <ol>
-                    <li data-i18n="article9_list1">運営者は以下の場合には、ユーザーの個別の同意を要せず、本規約を変更することができるものとします。
+                    <li><span data-i18n="article9_list1">運営者は以下の場合には、ユーザーの個別の同意を要せず、本規約を変更することができるものとします。</span>
                         <ul>
                             <li data-i18n="article9_list1_sub1">本規約の変更がユーザーの一般の利益に適合するとき</li>
                             <li data-i18n="article9_list1_sub2">本規約の変更が本サービス利用契約の目的に反せず、かつ、変更の必要性、変更後の内容の相当性その他の変更に係る事情に照らして合理的なものであるとき</li>
@@ -104,10 +98,10 @@
                 </ol>
 
                 <h2 class="section-title" data-i18n="article10_title">第10条（個人情報の取扱い）</h2>
-                <p data-i18n="article10_text">運営者は、本サービスの利用によって取得する個人情報については、「<a href="privacy-policy.html">プライバシーポリシー</a>」に従い適切に取り扱うものとします。</p>
+                <p data-i18n="article10_text">OCRとローカルNLLB-200翻訳はPC内で処理され、初回セットアップ後はオフラインで利用できます。最終版はBaketaのサーバー（Relay Server / Supabase）と通信せず、使用統計やクラッシュレポートも送信しません。最終版アプリの利用によりBaketaの運営者が取得・保存するデータはありません。 最終版の初回起動時に、旧版がPC内に保存したログイン情報・ライセンス情報を削除します。削除に失敗した場合は次回以降の起動時に再試行します。このローカル削除と、旧サーバー上のデータ削除は別の処理です。 <a href="privacy-policy.html">プライバシーポリシー</a>.</p>
 
                 <h2 class="section-title" data-i18n="article11_title">第11条（通知または連絡）</h2>
-                <p data-i18n="article11_text">ユーザーと運営者との間の通知または連絡は、運営者の定める方法によって行うものとします。運営者は、ユーザーから運営者が別途定める方式に従った変更届け出がない限り、現在登録されている連絡先が有効なものとみなして当該連絡先へ通知または連絡を行い、これらは、発信時にユーザーへ到達したものとみなします。</p>
+                <p data-i18n="article11_text">プライバシーに関するお問い合わせ・データ削除請求は、引き続き<a href="mailto:privacy@baketa.app">privacy@baketa.app</a>で受け付けます。製品サポートは終了しています。 本規約の変更やサービス終了に関するお知らせは、このウェブサイトに掲載します。</p>
 
                 <h2 class="section-title" data-i18n="article12_title">第12条（権利義務の譲渡の禁止）</h2>
                 <p data-i18n="article12_text">ユーザーは、運営者の書面による事前の承諾なく、利用契約上の地位または本規約に基づく権利もしくは義務を第三者に譲渡し、または担保に供することはできません。</p>
@@ -124,7 +118,7 @@
     <footer class="footer">
         <div class="container">
             <p data-i18n="footer_copyright">&copy; 2025 Baketa. All rights reserved.</p>
-            <p data-i18n="footer_updated">最終更新日: 2025年11月27日</p>
+            <p data-i18n="footer_updated">最終更新日: 2026-11-15</p>
         </div>
     </footer>
 

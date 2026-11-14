@@ -798,3 +798,12 @@ tr:hover td {
     border: 1px solid #ccc;
   }
 }
+
+/* Long legal headings, links and language controls must fit narrow screens. */
+.page--legal { overflow-wrap: anywhere; }
+.page--legal .header__inner,
+.page--legal .header__nav {
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.page--legal .header__nav { min-width: 0; max-width: 100%; }
