@@ -48,6 +48,7 @@
 ## 事前（11/29より前）
 
 1. [ ] **DNS管理画面 / Cloudflare / Supabase** — 全DNSレコードとWorker route/custom domain/previewを棚卸しする。
+   [公開DNS棚卸し（2026-11-14）と撤収時の扱い](dns-inventory.md)を参照。
    上のapi/auth/mailに加えapex・MX・TXT・CAA・DKIM・ワイルドカード・wwwを用途と所有先で分類する。
    **確認:** 既存の受信MXとprivacy宛転送先、Pagesの公開元を特定。秘密値を記録しない。
    **復旧:** 棚卸しは読み取りのみ。DNS削除は再設定できるが伝播待ちがある。
