@@ -185,7 +185,7 @@
 
   <ItemGroup>
     <!-- 🔄 Avalonia 11.3.3 - NetSparkleUpdater.UI.Avalonia 3.0.4 との互換性のためアップグレード -->
-    <PackageReference Include="Avalonia" Version="11.3.3" />
+    <PackageReference Include="Avalonia" Version="11.3.8" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.3" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.3" />
@@ -194,7 +194,7 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.3" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
     <PackageReference Include="Avalonia.Xaml.Interactivity" Version="11.3.0.6" />
     <PackageReference Include="NetSparkleUpdater.SparkleUpdater" Version="3.0.4" />
     <PackageReference Include="NetSparkleUpdater.UI.Avalonia" Version="3.0.4" />
