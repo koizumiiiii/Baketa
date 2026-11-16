@@ -82,7 +82,7 @@
 		
 		<!-- Google.Protobuf for SentencePiece model parsing -->
 		<PackageReference Include="Google.Protobuf" Version="3.32.1" />
-		<PackageReference Include="Google.Protobuf.Tools" Version="3.32.1">
+		<PackageReference Include="Google.Protobuf.Tools" Version="3.36.2">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
 		</PackageReference>
