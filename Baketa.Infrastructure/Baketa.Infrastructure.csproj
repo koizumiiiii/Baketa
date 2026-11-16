@@ -81,7 +81,7 @@
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
 		
 		<!-- Google.Protobuf for SentencePiece model parsing -->
-		<PackageReference Include="Google.Protobuf" Version="3.32.1" />
+		<PackageReference Include="Google.Protobuf" Version="3.36.2" />
 		<PackageReference Include="Google.Protobuf.Tools" Version="3.32.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
@@ -90,7 +90,7 @@
 		<!-- Phase 2.1: gRPC クライアント通信 -->
 		<PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
 		<!-- [Issue #328] gRPC Native Health Check -->
-		<PackageReference Include="Grpc.HealthCheck" Version="2.70.0" />
+		<PackageReference Include="Grpc.HealthCheck" Version="2.85.0" />
 		<PackageReference Include="Grpc.Tools" Version="2.70.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
