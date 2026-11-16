@@ -37,9 +37,9 @@
     </PackageReference>
     
     <!-- Avalonia UI (統合テスト用) - 11.3.3 (NetSparkle互換性のためアップグレード) -->
-    <PackageReference Include="Avalonia" Version="11.3.3" />
+    <PackageReference Include="Avalonia" Version="11.3.8" />
     <PackageReference Include="Avalonia.Headless" Version="11.3.3" />
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.3" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
   </ItemGroup>
 
   <ItemGroup>
